@@ -6,6 +6,8 @@
 profile_default/
 ipython_config.py
 
+# Data
+.data/*
 # Remove previous ipynb_checkpoints
 #   git rm -r .ipynb_checkpoints/
 
