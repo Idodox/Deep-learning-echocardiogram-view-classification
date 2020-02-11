@@ -106,47 +106,54 @@ class SimpleNet(nn.Module):
 
 
 class cnn_3d_1(nn.Module):
-    def __init__(self):
+    def __init__(self, max_frames, resolution, conv1_in_ch, conv1_out_ch, conv1_kernel, bn1_n_features, conv2_in_ch, conv2_out_ch,
+                 conv2_kernel, bn2_n_features, conv3_in_ch, conv3_out_ch, conv3_kernel, bn3_n_features,
+                 maxpool1_kernel, fc1_size, fc2_size):
         super().__init__()
+
+        self.max_frames = max_frames
+        self.resolution = resolution
+        self.conv1_in_ch = conv1_in_ch
+        self.conv1_out_ch = conv1_out_ch
+        self.conv1_kernel = conv1_kernel
+        self.bn1_n_features = bn1_n_features
+        self.conv2_in_ch = conv2_in_ch
+        self.conv2_out_ch = conv2_out_ch
+        self.conv2_kernel = conv2_kernel
+        self.bn2_n_features = bn2_n_features
+        self.conv3_in_ch = conv3_in_ch
+        self.conv3_out_ch = conv3_out_ch
+        self.conv3_kernel = conv3_kernel
+        self.bn3_n_features = bn3_n_features
+        self.maxpool1_kernel = maxpool1_kernel
+        self.fc1_size = fc1_size
+        self.fc2_size = fc2_size
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        # channels is 1 because we are using grayscale images
-        self.conv1 = nn.Conv3d(in_channels = 1, out_channels = 16, kernel_size = 3)
-        self.bn1 = nn.BatchNorm3d(num_features = 16)
-        self.conv2 = nn.Conv3d(in_channels = 16, out_channels = 16, kernel_size = 3)
-        self.bn2 = nn.BatchNorm3d(num_features = 16)
-        self.conv3 = nn.Conv3d(in_channels = 16, out_channels = 16, kernel_size = 3)
-        self.bn3 = nn.BatchNorm3d(num_features = 16)
-        self.maxpool1 = nn.MaxPool3d(2)
-        # self.conv4 = nn.Conv3d(in_channels = 32, out_channels = 64, kernel_size = 3)
-        # self.bn4 = nn.BatchNorm3d(num_features = 64)
-        # self.conv5 = nn.Conv3d(in_channels = 64, out_channels = 64, kernel_size = 3)
-        # self.bn5 = nn.BatchNorm3d(num_features = 64)
-        # self.conv6 = nn.Conv3d(in_channels = 64, out_channels = 64, kernel_size = 3)
-        # self.bn6 = nn.BatchNorm3d(num_features = 64)
-        # self.maxpool2 = nn.MaxPool3d(2)
-        # self.conv3 = nn.conv3d(in_channels = 1, out_channels = 1, kernel_size = 3)
+        self.conv1 = nn.Conv3d(in_channels = self.conv1_in_ch, out_channels = self.conv1_out_ch, kernel_size = self.conv1_kernel)
+        self.bn1 = nn.BatchNorm3d(num_features = self.bn1_n_features)
+        self.conv2 = nn.Conv3d(in_channels = self.conv2_in_ch, out_channels = self.conv2_out_ch, kernel_size = self.conv2_kernel)
+        self.bn2 = nn.BatchNorm3d(num_features = self.bn2_n_features)
+        self.conv3 = nn.Conv3d(in_channels = self.conv3_in_ch, out_channels = self.conv3_out_ch, kernel_size = self.conv3_kernel)
+        self.bn3 = nn.BatchNorm3d(num_features = self.bn3_n_features)
+        self.maxpool1 = nn.MaxPool3d(self.maxpool1_kernel)
 
-        # input_dims = self.calc_input_dims(10, 10)
+        self.input_dims = self.calc_input_dims()
 
-        self.fc1 = nn.Linear(in_features= 16 * 2 * 47 * 47, out_features=1000)
-        self.fc2 = nn.Linear(in_features= 1000, out_features=200)
-        self.out = nn.Linear(in_features=200, out_features=3)
+        self.fc1 = nn.Linear(in_features = self.input_dims, out_features = self.fc1_size)
+        self.fc2 = nn.Linear(in_features = self.fc1_size, out_features= self.fc2_size)
+        self.out = nn.Linear(in_features = self.fc2_size, out_features = 3)
 
         self.to(self.device)
 
-    def calc_input_dims(self, batch_size, n_frames):
+    def calc_input_dims(self):
         # we don't care about result just shape so won't include activations and BN layers
-        batch_data = torch.zeros((batch_size, 1, n_frames, 100, 100))
+        batch_data = torch.zeros((1, 1, self.max_frames, self.resolution, self.resolution))
         batch_data = self.conv1(batch_data)
         batch_data = self.conv2(batch_data)
         batch_data = self.conv3(batch_data)
         batch_data = self.maxpool1(batch_data)
-        # batch_data = self.conv4(batch_data)
-        # batch_data = self.conv5(batch_data)
-        # batch_data = self.conv6(batch_data)
-        # batch_data = self.maxpool2(batch_data)
-        # N elements in batch_size of 1 (batch of image sets)
+
         return int(np.prod(batch_data.size()))
 
 
@@ -156,23 +163,6 @@ class cnn_3d_1(nn.Module):
 
         # convert from ByteTensor (uint8) to float so we can run on CPU:
         t = t.float()
-
-
-        self.conv1 = nn.Conv3d(in_channels = 1, out_channels = 16, kernel_size = 3)
-        self.bn1 = nn.BatchNorm3d(num_features = 16)
-        self.conv2 = nn.Conv3d(in_channels = 16, out_channels = 16, kernel_size = 3)
-        self.bn2 = nn.BatchNorm3d(num_features = 16)
-        self.conv3 = nn.Conv3d(in_channels = 16, out_channels = 16, kernel_size = 3)
-        self.bn3 = nn.BatchNorm3d(num_features = 16)
-        self.maxpool1 = nn.MaxPool3d(2)
-        # self.conv4 = nn.Conv3d(in_channels = 32, out_channels = 64, kernel_size = 3)
-        # self.bn4 = nn.BatchNorm3d(num_features = 64)
-        # self.conv5 = nn.Conv3d(in_channels = 64, out_channels = 64, kernel_size = 3)
-        # self.bn5 = nn.BatchNorm3d(num_features = 64)
-        # self.conv6 = nn.Conv3d(in_channels = 64, out_channels = 64, kernel_size = 3)
-        # self.bn6 = nn.BatchNorm3d(num_features = 64)
-        # self.maxpool2 = nn.MaxPool3d(2)
-
 
         t = self.conv1(t)
         t = self.bn1(t)
@@ -188,21 +178,8 @@ class cnn_3d_1(nn.Module):
 
         t = self.maxpool1(t)
 
-        # t = self.conv4(t)
-        # t = self.bn4(t)
-        # t = F.relu(t)
-        #
-        # t = self.conv5(t)
-        # t = self.bn5(t)
-        # t = F.relu(t)
-        #
-        # t = self.conv6(t)
-        # t = self.bn6(t)
-        # t = F.relu(t)
-        #
-        # t = self.maxpool2(t)
+        t = t.reshape(-1, self.input_dims) # N_features * N_frames * height * width
 
-        t = t.reshape(-1, 16*2*47*47) # N_features * N_frames * height * width
         t = self.fc1(t)
         t = F.relu(t)
 
