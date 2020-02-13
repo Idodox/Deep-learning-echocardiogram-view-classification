@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import Sampler
 from pathlib import Path
+from sklearn.model_selection import train_test_split
 import os
 import re
 import pickle
@@ -94,37 +95,29 @@ def pickle_loader(path, max_frames = None):
         print('Loading pickle file failed. path:', path)
 
 
-class StratifiedSampler(Sampler):
-    """Stratified Sampling
-    Provides equal representation of target classes in each batch
-    """
+def get_train_val_idx(data_set):
+    # Separate data set into movie names so we can split by movie:
+    movie_list = list()
+    label_list = list()
 
-    def __init__(self, class_vector, batch_size):
-        """
-        Arguments
-        ---------
-        class_vector : torch tensor
-            a vector of class labels
-        batch_size : integer
-            batch_size
-        """
-        self.n_splits = int(class_vector.size(0) / batch_size)
-        self.class_vector = class_vector
+    for (path, label) in data_set.samples:
+        movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+        if movie_name not in movie_list:
+            movie_list.append(movie_name)
+            label_list.append(label)
 
-    def gen_sample_array(self):
-        try:
-            from sklearn.model_selection import StratifiedShuffleSplit
-        except:
-            print('Need scikit-learn for this functionality')
-        import numpy as np
+    X_train, X_val, y_train, y_val = train_test_split(movie_list, label_list, stratify=label_list, test_size=0.2,
+                                                      random_state=42)
 
-        s = StratifiedShuffleSplit(n_splits=self.n_splits, test_size=0.5)
-        X = th.randn(self.class_vector.size(0), 2).numpy()
-        y = self.class_vector.numpy()
-        s.get_n_splits(X, y)
+    train_idx = list()
+    val_idx = list()
+    for i, (path, label) in enumerate(data_set.samples):
+        movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+        if movie_name in X_train:
+            train_idx.append(i)
+        elif movie_name in X_val:
+            val_idx.append(i)
+        else:
+            raise NameError("movie not in X_train or in X_val")
 
-        train_index, test_index = next(s.split(X, y))
-        return np.hstack([train_index, test_index])
-
-# files = get_frame_sequences('/Users/idofarhi/Documents/Thesis/Data/frames')
-# print(files)
+    return train_idx, val_idx
