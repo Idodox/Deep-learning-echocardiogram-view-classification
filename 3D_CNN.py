@@ -41,15 +41,6 @@ hyper_params = {"learning_rate": 0.00001
                ,"fc2_size": 1000
                 }
 
-experiment.log_parameters(hyper_params)
-
-
-data_transforms = transforms.Compose([
-    # TODO: normalize
-    transforms.ToTensor()
-])
-
-# Load the dataset with ImageFolder:
 
 network = cnn_3d_1(hyper_params['max_frames'], hyper_params['resolution'], hyper_params['conv1_in_ch'],
                    hyper_params['conv1_out_ch'], hyper_params['conv1_kernel'], hyper_params['bn1_n_features'],
@@ -57,6 +48,17 @@ network = cnn_3d_1(hyper_params['max_frames'], hyper_params['resolution'], hyper
                    hyper_params['bn2_n_features'], hyper_params['conv3_in_ch'], hyper_params['conv3_out_ch'],
                    hyper_params['conv3_kernel'], hyper_params['bn3_n_features'], hyper_params['maxpool1_kernel'],
                    hyper_params['fc1_size'], hyper_params['fc2_size'])
+
+hyper_params['total_params'] = sum(p.numel() for p in network.parameters() if p.requires_grad)
+hyper_params['trainable_params'] = sum(p.numel() for p in network.parameters())
+
+experiment.log_parameters(hyper_params)
+
+
+data_transforms = transforms.Compose([
+    # TODO: normalize
+    transforms.ToTensor()
+])
 
 ROOT_PATH = str(Path.home()) + "/Documents/Thesis/Data/frames/" + hyper_params['dataset']
 
