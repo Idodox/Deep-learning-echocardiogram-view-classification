@@ -9,7 +9,8 @@ from tqdm import tqdm
 from pathlib import Path
 
 from network_architectures import cnn_3d_1
-from helper_methods import pickle_loader, get_num_correct, get_train_val_idx
+from helper_methods import pickle_loader, get_num_correct, \
+                           get_train_val_idx, DatasetFolderWithPaths, print_mistakes
 
 
 # Comet ML experiment
@@ -17,27 +18,29 @@ experiment = Experiment(api_key="BEnSW6NdCjUCZsWIto0yhxts1" ,project_name="thesi
 
 hyper_params = {"learning_rate": 0.00001
                ,"n_epochs": 50
-               ,"batch_size": 30
-               ,"num_workers": 3
+               ,"batch_size": 40
+               ,"num_workers": 2
                ,"normalized_data": False
                ,"stratified": True
                ,"max_frames": 10
                ,"dataset": "5frame_steps"
                ,"resolution": 100
                ,"conv1_in_ch": 1
-               ,"conv1_out_ch": 32
-               ,"conv1_kernel": 3
-               ,"bn1_n_features": 32
-               ,"conv2_in_ch": 32
-               ,"conv2_out_ch": 16
-               ,"conv2_kernel": 3
-               ,"bn2_n_features": 16
-               ,"conv3_in_ch": 16
+               ,"conv1_out_ch": 8
+               ,"conv1_kernel": (3, 5, 5)
+               ,"bn1_n_features": 8
+               ,"conv2_in_ch": 8
+               ,"conv2_out_ch": 8
+               ,"conv2_kernel": (3, 5, 5)
+               ,"bn2_n_features": 8
+               ,"conv3_in_ch": 8
                ,"conv3_out_ch": 8
-               ,"conv3_kernel": 3
+               ,"conv3_kernel": (3, 5, 5)
                ,"bn3_n_features": 8
                ,"maxpool1_kernel": 2
                ,"fc1_size": 1000
+               ,"dropout1_ratio": 0.7
+               ,"dropout2_ratio": 0.7
                ,"fc2_size": 1000
                 }
 
@@ -47,10 +50,12 @@ network = cnn_3d_1(hyper_params['max_frames'], hyper_params['resolution'], hyper
                    hyper_params['conv2_in_ch'], hyper_params['conv2_out_ch'], hyper_params['conv2_kernel'],
                    hyper_params['bn2_n_features'], hyper_params['conv3_in_ch'], hyper_params['conv3_out_ch'],
                    hyper_params['conv3_kernel'], hyper_params['bn3_n_features'], hyper_params['maxpool1_kernel'],
-                   hyper_params['fc1_size'], hyper_params['fc2_size'])
+                   hyper_params['fc1_size'], hyper_params['dropout1_ratio'], hyper_params['dropout2_ratio'],
+                   hyper_params['fc2_size'])
 
 hyper_params['total_params'] = sum(p.numel() for p in network.parameters() if p.requires_grad)
 hyper_params['trainable_params'] = sum(p.numel() for p in network.parameters())
+print('N_params:', hyper_params['total_params'], 'N_trainable_params:', hyper_params['trainable_params'])
 
 experiment.log_parameters(hyper_params)
 
@@ -62,7 +67,7 @@ data_transforms = transforms.Compose([
 
 ROOT_PATH = str(Path.home()) + "/Documents/Thesis/Data/frames/" + hyper_params['dataset']
 
-master_data_set = torchvision.datasets.DatasetFolder(ROOT_PATH
+master_data_set = DatasetFolderWithPaths(ROOT_PATH
                                 # , transform = data_transforms
                                 , loader = partial(pickle_loader, max_frames = hyper_params['max_frames'])
                                 , extensions = '.pickle'
@@ -103,12 +108,13 @@ for epoch in tqdm(range(hyper_params["n_epochs"])):
     total_train_correct = 0
 
     network.train()
-    for batch_number, (images, labels) in tqdm(enumerate(train_loader)):
+    for batch_number, (images, labels, paths) in tqdm(enumerate(train_loader)):
 
         images = torch.unsqueeze(images, 1)  # added channel dimensions (grayscale)
 
         optimizer.zero_grad() # Whenever pytorch calculates gradients it always adds it to whatever it has, so we need to reset it each batch.
         preds = network(images) # Pass Batch
+
         loss = criterion(preds, labels) # Calculate Loss
         total_train_loss += loss.item()
         loss.backward() # Calculate Gradients - the gradient is the direction we need to move towards the loss function minimum (LR will tell us how far to step)
@@ -122,6 +128,7 @@ for epoch in tqdm(range(hyper_params["n_epochs"])):
         log_number_train += 1
 
         print('Train: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct/len(labels)), 'Loss:', loss.item())
+        print_mistakes(preds, labels, paths)
 
     experiment.log_metric("Train epoch accuracy", total_train_correct/len(train_loader.dataset)*100, step = epoch)
     experiment.log_metric("Train epoch CrossEntropyLoss", total_train_loss, step = epoch)
@@ -133,7 +140,7 @@ for epoch in tqdm(range(hyper_params["n_epochs"])):
 
     network.eval()
     with torch.no_grad():
-        for batch_number, (images, labels) in tqdm(enumerate(val_loader)):
+        for batch_number, (images, labels, paths) in tqdm(enumerate(val_loader)):
             images = torch.unsqueeze(images, 1)  # added channel dimensions (grayscale)
 
             preds = network(images)  # Pass Batch
@@ -148,6 +155,7 @@ for epoch in tqdm(range(hyper_params["n_epochs"])):
             log_number_val += 1
 
             print('Val: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct / len(labels)), 'Loss:', loss.item())
+            print_mistakes(preds, labels, paths)
 
         experiment.log_metric("Val epoch accuracy", total_val_correct / len(val_loader.dataset) * 100, step=epoch)
         experiment.log_metric("Val epoch CrossEntropyLoss", total_val_loss, step=epoch)

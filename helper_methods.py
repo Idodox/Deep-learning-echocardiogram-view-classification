@@ -1,5 +1,4 @@
 import torchvision
-import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import Sampler
 from pathlib import Path
@@ -11,18 +10,6 @@ import pickle
 
 def get_num_correct(preds, labels):
     return preds.argmax(dim=1).eq(labels).sum().item()
-
-
-def plot_batch(batch, ncolumns = 10, show_labels = False):
-    images, labels = batch
-
-    # grid row argument says rows but varies columns.
-    grid = torchvision.utils.make_grid(images, nrow = ncolumns)
-
-    plt.figure(figsize=(15, 7))
-    plt.imshow(np.transpose(grid, (1, 2, 0)))
-    if show_labels:
-        print('labels:', labels)
 
 
 def get_frame_sequences(frames_folder_path):
@@ -66,19 +53,6 @@ def get_frame_sequences(frames_folder_path):
     return files
 
 
-def get_frames(folder, file_name, frame_numbers, frames_folder_path = str(Path.home()) + "/Documents/Thesis/Data/frames"):
-    """
-    :param folder: (str) class name
-    :param file_name: name of video we want the frames for
-    :param frame_numbers: frame numbers
-    :param frames_folder_path: path for frames folder
-    :return: array of requested frames
-    """
-    pass
-
-
-# files = get_frame_sequences(str(Path.home()) + "/Documents/Thesis/Data/frames")
-
 def pickle_loader(path, max_frames = None):
     """
     :param path: path to pickle file
@@ -93,6 +67,15 @@ def pickle_loader(path, max_frames = None):
         return file
     except:
         print('Loading pickle file failed. path:', path)
+
+
+def print_mistakes(preds, labels, paths):
+    preds_check = preds.argmax(dim=1).eq(labels)
+    mistake_paths = [path for (i, path) in enumerate(paths) if preds_check[i] == False]
+    predicted_view = [view.item() for (i, view) in enumerate(preds.argmax(dim=1)) if preds_check[i] == False]
+    ground_truth_view = [view.item() for (i, view) in enumerate(labels) if preds_check[i] == False]
+    for (true_v, predicted_v, path) in zip(ground_truth_view, predicted_view, mistake_paths):
+        print("Predicted, true view:", predicted_v, true_v, path)
 
 
 def get_train_val_idx(data_set):
@@ -121,3 +104,23 @@ def get_train_val_idx(data_set):
             raise NameError("movie not in X_train or in X_val")
 
     return train_idx, val_idx
+
+
+
+import torch
+from torchvision import datasets
+
+class DatasetFolderWithPaths(datasets.DatasetFolder):
+    """Custom dataset that includes file paths. Extends
+    torchvision.datasets.DatasetFolder
+    """
+
+    # override the __getitem__ method. this is the method that dataloader calls
+    def __getitem__(self, index):
+        # this is what DatasetFolder normally returns
+        original_tuple = super(DatasetFolderWithPaths, self).__getitem__(index)
+        # data file path
+        path = self.samples[index][0]
+        # make a new tuple that includes original and the path
+        tuple_with_path = (original_tuple + (path,))
+        return tuple_with_path

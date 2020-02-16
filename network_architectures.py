@@ -108,7 +108,7 @@ class SimpleNet(nn.Module):
 class cnn_3d_1(nn.Module):
     def __init__(self, max_frames, resolution, conv1_in_ch, conv1_out_ch, conv1_kernel, bn1_n_features, conv2_in_ch, conv2_out_ch,
                  conv2_kernel, bn2_n_features, conv3_in_ch, conv3_out_ch, conv3_kernel, bn3_n_features,
-                 maxpool1_kernel, fc1_size, fc2_size):
+                 maxpool1_kernel, fc1_size, dropout1_ratio, dropout2_ratio, fc2_size):
         super().__init__()
 
         self.max_frames = max_frames
@@ -127,6 +127,8 @@ class cnn_3d_1(nn.Module):
         self.bn3_n_features = bn3_n_features
         self.maxpool1_kernel = maxpool1_kernel
         self.fc1_size = fc1_size
+        self.dropout1_ratio = dropout1_ratio
+        self.dropout2_ratio = dropout2_ratio
         self.fc2_size = fc2_size
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -141,7 +143,9 @@ class cnn_3d_1(nn.Module):
         self.input_dims = self.calc_input_dims()
 
         self.fc1 = nn.Linear(in_features = self.input_dims, out_features = self.fc1_size)
+        self.drop_layer1 = nn.Dropout(p= self.dropout1_ratio)
         self.fc2 = nn.Linear(in_features = self.fc1_size, out_features= self.fc2_size)
+        self.drop_layer2 = nn.Dropout(p= self.dropout2_ratio)
         self.out = nn.Linear(in_features = self.fc2_size, out_features = 3)
 
         self.to(self.device)
@@ -183,8 +187,12 @@ class cnn_3d_1(nn.Module):
         t = self.fc1(t)
         t = F.relu(t)
 
+        t = self.drop_layer1(t)
+
         t = self.fc2(t)
         t = F.relu(t)
+
+        t = self.drop_layer1(t)
 
         # output layer
         t = self.out(t)
