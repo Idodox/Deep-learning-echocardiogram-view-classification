@@ -1,163 +1,1 @@
-from comet_ml import Experiment
-import torch
-import torch.optim as optim
-import torch.nn as nn
-import torchvision
-from torchvision import transforms
-from functools import partial
-from tqdm import tqdm
-from pathlib import Path
-
-from network_architectures import cnn_3d_1
-from helper_methods import pickle_loader, get_num_correct, \
-                           get_train_val_idx, DatasetFolderWithPaths, print_mistakes
-
-
-# Comet ML experiment
-experiment = Experiment(api_key="BEnSW6NdCjUCZsWIto0yhxts1" ,project_name="thesis" ,workspace="idodox")
-
-hyper_params = {"learning_rate": 0.00001
-               ,"n_epochs": 50
-               ,"batch_size": 40
-               ,"num_workers": 2
-               ,"normalized_data": False
-               ,"stratified": True
-               ,"max_frames": 10
-               ,"dataset": "5frame_steps"
-               ,"resolution": 100
-               ,"conv1_in_ch": 1
-               ,"conv1_out_ch": 8
-               ,"conv1_kernel": (3, 5, 5)
-               ,"bn1_n_features": 8
-               ,"conv2_in_ch": 8
-               ,"conv2_out_ch": 8
-               ,"conv2_kernel": (3, 5, 5)
-               ,"bn2_n_features": 8
-               ,"conv3_in_ch": 8
-               ,"conv3_out_ch": 8
-               ,"conv3_kernel": (3, 5, 5)
-               ,"bn3_n_features": 8
-               ,"maxpool1_kernel": 2
-               ,"fc1_size": 1000
-               ,"dropout1_ratio": 0.7
-               ,"dropout2_ratio": 0.7
-               ,"fc2_size": 1000
-                }
-
-
-network = cnn_3d_1(hyper_params['max_frames'], hyper_params['resolution'], hyper_params['conv1_in_ch'],
-                   hyper_params['conv1_out_ch'], hyper_params['conv1_kernel'], hyper_params['bn1_n_features'],
-                   hyper_params['conv2_in_ch'], hyper_params['conv2_out_ch'], hyper_params['conv2_kernel'],
-                   hyper_params['bn2_n_features'], hyper_params['conv3_in_ch'], hyper_params['conv3_out_ch'],
-                   hyper_params['conv3_kernel'], hyper_params['bn3_n_features'], hyper_params['maxpool1_kernel'],
-                   hyper_params['fc1_size'], hyper_params['dropout1_ratio'], hyper_params['dropout2_ratio'],
-                   hyper_params['fc2_size'])
-
-hyper_params['total_params'] = sum(p.numel() for p in network.parameters() if p.requires_grad)
-hyper_params['trainable_params'] = sum(p.numel() for p in network.parameters())
-print('N_params:', hyper_params['total_params'], 'N_trainable_params:', hyper_params['trainable_params'])
-
-experiment.log_parameters(hyper_params)
-
-
-data_transforms = transforms.Compose([
-    # TODO: normalize
-    transforms.ToTensor()
-])
-
-ROOT_PATH = str(Path.home()) + "/Documents/Thesis/Data/frames/" + hyper_params['dataset']
-
-master_data_set = DatasetFolderWithPaths(ROOT_PATH
-                                # , transform = data_transforms
-                                , loader = partial(pickle_loader, max_frames = hyper_params['max_frames'])
-                                , extensions = '.pickle'
-                                )
-
-train_idx, val_idx = get_train_val_idx(master_data_set)
-
-
-train_set = torch.utils.data.Subset(master_data_set, train_idx)
-val_set = torch.utils.data.Subset(master_data_set, val_idx)
-
-train_loader = torch.utils.data.DataLoader(train_set
-                                     , batch_size=hyper_params['batch_size']
-                                     , shuffle=True
-                                     # ,batch_sampler =  # TODO: add stratified sampling
-                                     , num_workers=hyper_params['num_workers']
-                                     , drop_last=False
-                                     )
-
-val_loader = torch.utils.data.DataLoader(val_set
-                                     , batch_size=hyper_params['batch_size']
-                                     , shuffle=True
-                                     # ,batch_sampler =  # TODO: add stratified sampling
-                                     , num_workers=hyper_params['num_workers']
-                                     , drop_last=False
-                                     )
-
-
-optimizer = optim.Adam(network.parameters(), lr=hyper_params['learning_rate'])
-criterion = nn.CrossEntropyLoss()
-
-log_number_train = log_number_val = 0
-
-
-for epoch in tqdm(range(hyper_params["n_epochs"])):
-
-    total_train_loss = 0
-    total_train_correct = 0
-
-    network.train()
-    for batch_number, (images, labels, paths) in tqdm(enumerate(train_loader)):
-
-        images = torch.unsqueeze(images, 1)  # added channel dimensions (grayscale)
-
-        optimizer.zero_grad() # Whenever pytorch calculates gradients it always adds it to whatever it has, so we need to reset it each batch.
-        preds = network(images) # Pass Batch
-
-        loss = criterion(preds, labels) # Calculate Loss
-        total_train_loss += loss.item()
-        loss.backward() # Calculate Gradients - the gradient is the direction we need to move towards the loss function minimum (LR will tell us how far to step)
-        optimizer.step() # Update Weights - the optimizer is able to update the weights because we passed it the weights as an argument in line 4.
-
-        num_correct = get_num_correct(preds, labels)
-        total_train_correct += num_correct
-
-        experiment.log_metric("Train batch accuracy", num_correct/len(labels)*100, step = log_number_train)
-        experiment.log_metric("Train batch CrossEntropyLoss", loss.item(), step = log_number_train)
-        log_number_train += 1
-
-        print('Train: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct/len(labels)), 'Loss:', loss.item())
-        print_mistakes(preds, labels, paths)
-
-    experiment.log_metric("Train epoch accuracy", total_train_correct/len(train_loader.dataset)*100, step = epoch)
-    experiment.log_metric("Train epoch CrossEntropyLoss", total_train_loss, step = epoch)
-    print('Train: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', "{:.2%}".format(total_train_correct/len(train_loader.dataset)), 'Batch loss:', total_train_loss)
-
-
-    total_val_loss = 0
-    total_val_correct = 0
-
-    network.eval()
-    with torch.no_grad():
-        for batch_number, (images, labels, paths) in tqdm(enumerate(val_loader)):
-            images = torch.unsqueeze(images, 1)  # added channel dimensions (grayscale)
-
-            preds = network(images)  # Pass Batch
-            loss = criterion(preds, labels)  # Calculate Loss
-            total_val_loss += loss.item()
-
-            num_correct = get_num_correct(preds, labels)
-            total_val_correct += num_correct
-
-            experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=log_number_val)
-            experiment.log_metric("Val batch CrossEntropyLoss", loss.item(), step=log_number_val)
-            log_number_val += 1
-
-            print('Val: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct / len(labels)), 'Loss:', loss.item())
-            print_mistakes(preds, labels, paths)
-
-        experiment.log_metric("Val epoch accuracy", total_val_correct / len(val_loader.dataset) * 100, step=epoch)
-        experiment.log_metric("Val epoch CrossEntropyLoss", total_val_loss, step=epoch)
-        print('Val Epoch:', epoch, 'num correct:', total_val_correct, 'Accuracy:',
-              "{:.2%}".format(total_val_correct / len(val_loader.dataset)), 'Batch loss:', total_val_loss)
+from comet_ml import Experimentimport torchimport torch.optim as optimimport torch.nn as nnimport torchvisionfrom torchvision import transformsfrom functools import partialfrom tqdm import tqdmfrom pathlib import Pathfrom modular_cnn import CNNClassifierfrom network_architectures import cnn_3d_1from torchsummary import summaryfrom helper_methods import pickle_loader, get_num_correct, get_train_val_idx, DatasetFolderWithPaths, get_mistakes, online_mean_and_stdtorch.backends.cudnn.benchmark=Trueprint('CUDA available:', torch.cuda.is_available())print('CUDA enabled:', torch.backends.cudnn.enabled)log_data = Truehyper_params = {"learning_rate": 0.00001               ,"n_epochs": 100               ,"batch_size": 36               ,"num_workers": 4               ,"normalized_data": True               ,"stratified": True               ,"max_frames": 10               ,"dataset": "5frame_steps"               ,"resolution": 100               ,"conv1_in_ch": 1               ,"conv1_out_ch": 128               ,"conv1_kernel": (3, 9, 9)               ,"bn1_n_features": 128               ,"conv2_in_ch": 128               ,"conv2_out_ch": 64               ,"conv2_kernel": (3, 9, 9)               ,"bn2_n_features": 64               ,"conv3_in_ch": 64               ,"conv3_out_ch": 32               ,"conv3_kernel": (3, 5, 5)               ,"bn3_n_features": 32               ,"conv4_in_ch": 32               ,"conv4_out_ch": 16               ,"conv4_kernel": (1, 3, 3)               ,"bn4_n_features": 16               ,"maxpool1_kernel": 3               ,"fc1_size": 128               ,"dropout1_ratio": 0.5               ,"fc2_size": 64               ,"dropout2_ratio": 0.5               ,"fc3_size": 32               ,"dropout3_ratio": 0.5                }network = cnn_3d_1(hyper_params)network = network.cuda()# Log number of parametershyper_params['trainable_params'] = sum(p.numel() for p in network.parameters())print('N_trainable_params:', hyper_params['trainable_params'])data_transforms = transforms.Compose([    transforms.ToTensor()    ,transforms.Normalize([53.91100598, 54.00132478, 54.09308712, 54.09459359, 54.12711804, 54.13030674, 54.09839364, 54.03708794, 53.8983994, 53.75836842]                          , [54.49093735, 54.5142583, 54.56545188, 54.56279357, 54.56717128, 54.57554804, 54.55975601, 54.55826991, 54.53283708, 54.50516662])])ROOT_PATH = str("/home/ido/data/" + hyper_params['dataset'])master_data_set = DatasetFolderWithPaths(ROOT_PATH                                # , transform = data_transforms                                , loader = partial(pickle_loader, max_frames = hyper_params['max_frames'])                                , extensions = '.pickle'                                )train_idx, val_idx = get_train_val_idx(master_data_set)train_set = torch.utils.data.Subset(master_data_set, train_idx)val_set = torch.utils.data.Subset(master_data_set, val_idx)train_loader = torch.utils.data.DataLoader(train_set                                     , batch_size=hyper_params['batch_size']                                     , shuffle=True                                     # ,batch_sampler =  # TODO: add stratified sampling                                     , num_workers=hyper_params['num_workers']                                     , drop_last=False                                     )# online_mean_and_std(train_loader)val_loader = torch.utils.data.DataLoader(val_set                                     , batch_size=hyper_params['batch_size']                                     , shuffle=True                                     # ,batch_sampler =  # TODO: add stratified sampling                                     , num_workers=hyper_params['num_workers']                                     , drop_last=False                                     )optimizer = optim.Adam(network.parameters(), lr=hyper_params['learning_rate'])criterion = nn.CrossEntropyLoss()log_number_train = log_number_val = 0summary(network, (1, 10, 100, 100))if log_data == True:    # Comet ML experiment    experiment = Experiment(api_key="BEnSW6NdCjUCZsWIto0yhxts1" ,project_name="thesis" ,workspace="idodox")    experiment.log_parameters(hyper_params)for epoch in tqdm(range(hyper_params["n_epochs"])):    total_train_loss = 0    total_train_correct = 0    incorrect_classifications_train = []    incorrect_classifications_test = []    epoch_classifications_train = []    epoch_classifications_test = []    network.train()    for batch_number, (images, labels, paths) in enumerate(train_loader):        images = torch.unsqueeze(images, 1).double().cuda()  # added channel dimensions (grayscale)        labels = labels.long().cuda()        optimizer.zero_grad() # Whenever pytorch calculates gradients it always adds it to whatever it has, so we need to reset it each batch.        preds = network(images) # Pass Batch        loss = criterion(preds, labels) # Calculate Loss        total_train_loss += loss.item()        loss.backward() # Calculate Gradients - the gradient is the direction we need to move towards the loss function minimum (LR will tell us how far to step)        optimizer.step() # Update Weights - the optimizer is able to update the weights because we passed it the weights as an argument in line 4.        num_correct = get_num_correct(preds, labels)        total_train_correct += num_correct        experiment.log_metric("Train batch accuracy", num_correct/len(labels)*100, step = log_number_train)        experiment.log_metric("Train batch CrossEntropyLoss", loss.item(), step = log_number_train)        log_number_train += 1        # print('Train: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct/len(labels)), 'Loss:', loss.item())        incorrect_classifications_train.append(get_mistakes(preds, labels, paths))    experiment.log_metric("Train epoch accuracy", total_train_correct/len(train_loader.dataset)*100, step = epoch)    experiment.log_metric("Train epoch CrossEntropyLoss", total_train_loss, step = epoch)    print('Train: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', "{:.2%}".format(total_train_correct/len(train_loader.dataset)), 'Batch loss:', total_train_loss)    total_val_loss = 0    total_val_correct = 0    network.eval()    with torch.no_grad():        for batch_number, (images, labels, paths) in enumerate(val_loader):            images = torch.unsqueeze(images, 1).double().cuda()  # added channel dimensions (grayscale)            labels = labels.long().cuda()            preds = network(images)  # Pass Batch            loss = criterion(preds, labels)  # Calculate Loss            total_val_loss += loss.item()            num_correct = get_num_correct(preds, labels)            total_val_correct += num_correct            experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=log_number_val)            experiment.log_metric("Val batch CrossEntropyLoss", loss.item(), step=log_number_val)            log_number_val += 1            # print('Val: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct / len(labels)), 'Loss:', loss.item())            # print_mistakes(preds, labels, paths)            incorrect_classifications_test.append(get_mistakes(preds, labels, paths))        experiment.log_metric("Val epoch accuracy", total_val_correct / len(val_loader.dataset) * 100, step=epoch)        experiment.log_metric("Val epoch CrossEntropyLoss", total_val_loss, step=epoch)        print('Val Epoch:', epoch, 'num correct:', total_val_correct, 'Accuracy:',              "{:.2%}".format(total_val_correct / len(val_loader.dataset)), 'Batch loss:', total_val_loss)    if epoch >= hyper_params['n_epochs']-1:        print('TRAIN MISCLASSIFICATIONS:')        print(incorrect_classifications_train)        print('TEST MISCLASSIFICATIONS:')        print(incorrect_classifications_test)

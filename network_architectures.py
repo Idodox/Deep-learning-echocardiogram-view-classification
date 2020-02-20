@@ -106,31 +106,35 @@ class SimpleNet(nn.Module):
 
 
 class cnn_3d_1(nn.Module):
-    def __init__(self, max_frames, resolution, conv1_in_ch, conv1_out_ch, conv1_kernel, bn1_n_features, conv2_in_ch, conv2_out_ch,
-                 conv2_kernel, bn2_n_features, conv3_in_ch, conv3_out_ch, conv3_kernel, bn3_n_features,
-                 maxpool1_kernel, fc1_size, dropout1_ratio, dropout2_ratio, fc2_size):
+    def __init__(self, params):
         super().__init__()
 
-        self.max_frames = max_frames
-        self.resolution = resolution
-        self.conv1_in_ch = conv1_in_ch
-        self.conv1_out_ch = conv1_out_ch
-        self.conv1_kernel = conv1_kernel
-        self.bn1_n_features = bn1_n_features
-        self.conv2_in_ch = conv2_in_ch
-        self.conv2_out_ch = conv2_out_ch
-        self.conv2_kernel = conv2_kernel
-        self.bn2_n_features = bn2_n_features
-        self.conv3_in_ch = conv3_in_ch
-        self.conv3_out_ch = conv3_out_ch
-        self.conv3_kernel = conv3_kernel
-        self.bn3_n_features = bn3_n_features
-        self.maxpool1_kernel = maxpool1_kernel
-        self.fc1_size = fc1_size
-        self.dropout1_ratio = dropout1_ratio
-        self.dropout2_ratio = dropout2_ratio
-        self.fc2_size = fc2_size
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.max_frames = params["max_frames"]
+        self.resolution = params["resolution"]
+        self.conv1_in_ch = params["conv1_in_ch"]
+        self.conv1_out_ch = params["conv1_out_ch"]
+        self.conv1_kernel = params["conv1_kernel"]
+        self.bn1_n_features = params["bn1_n_features"]
+        self.conv2_in_ch = params["conv2_in_ch"]
+        self.conv2_out_ch = params["conv2_out_ch"]
+        self.conv2_kernel = params["conv2_kernel"]
+        self.bn2_n_features = params["bn2_n_features"]
+        self.conv3_in_ch = params["conv3_in_ch"]
+        self.conv3_out_ch = params["conv3_out_ch"]
+        self.conv3_kernel = params["conv3_kernel"]
+        self.bn3_n_features = params["bn3_n_features"]
+        self.conv4_in_ch = params["conv4_in_ch"]
+        self.conv4_out_ch = params["conv4_out_ch"]
+        self.conv4_kernel = params["conv4_kernel"]
+        self.bn4_n_features = params["bn4_n_features"]
+        self.maxpool1_kernel = params["maxpool1_kernel"]
+        self.fc1_size = params["fc1_size"]
+        self.dropout1_ratio = params["dropout1_ratio"]
+        self.fc2_size = params["fc2_size"]
+        self.dropout2_ratio = params["dropout2_ratio"]
+        self.fc3_size = params["fc3_size"]
+        self.dropout3_ratio = params["dropout3_ratio"]
+        # self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
         self.conv1 = nn.Conv3d(in_channels = self.conv1_in_ch, out_channels = self.conv1_out_ch, kernel_size = self.conv1_kernel)
         self.bn1 = nn.BatchNorm3d(num_features = self.bn1_n_features)
@@ -138,6 +142,8 @@ class cnn_3d_1(nn.Module):
         self.bn2 = nn.BatchNorm3d(num_features = self.bn2_n_features)
         self.conv3 = nn.Conv3d(in_channels = self.conv3_in_ch, out_channels = self.conv3_out_ch, kernel_size = self.conv3_kernel)
         self.bn3 = nn.BatchNorm3d(num_features = self.bn3_n_features)
+        self.conv4 = nn.Conv3d(in_channels = self.conv4_in_ch, out_channels = self.conv4_out_ch, kernel_size = self.conv4_kernel)
+        self.bn4 = nn.BatchNorm3d(num_features = self.bn4_n_features)
         self.maxpool1 = nn.MaxPool3d(self.maxpool1_kernel)
 
         self.input_dims = self.calc_input_dims()
@@ -146,9 +152,11 @@ class cnn_3d_1(nn.Module):
         self.drop_layer1 = nn.Dropout(p= self.dropout1_ratio)
         self.fc2 = nn.Linear(in_features = self.fc1_size, out_features= self.fc2_size)
         self.drop_layer2 = nn.Dropout(p= self.dropout2_ratio)
-        self.out = nn.Linear(in_features = self.fc2_size, out_features = 3)
+        self.fc3 = nn.Linear(in_features = self.fc2_size, out_features= self.fc3_size)
+        self.drop_layer3 = nn.Dropout(p= self.dropout3_ratio)
+        self.out = nn.Linear(in_features = self.fc3_size, out_features = 3)
 
-        self.to(self.device)
+        # self.to(self.device)
 
     def calc_input_dims(self):
         # we don't care about result just shape so won't include activations and BN layers
@@ -156,6 +164,7 @@ class cnn_3d_1(nn.Module):
         batch_data = self.conv1(batch_data)
         batch_data = self.conv2(batch_data)
         batch_data = self.conv3(batch_data)
+        batch_data = self.conv4(batch_data)
         batch_data = self.maxpool1(batch_data)
 
         return int(np.prod(batch_data.size()))
@@ -163,7 +172,7 @@ class cnn_3d_1(nn.Module):
 
 
     def forward(self, t):  # Forward transformation the network performs on tensors
-        torch.tensor(t).to(self.device)
+        # torch.tensor(t).to(self.device)
 
         # convert from ByteTensor (uint8) to float so we can run on CPU:
         t = t.float()
@@ -180,22 +189,33 @@ class cnn_3d_1(nn.Module):
         t = self.bn3(t)
         t = F.relu(t)
 
+        t = self.conv4(t)
+        t = self.bn4(t)
+        t = F.relu(t)
+
         t = self.maxpool1(t)
 
         t = t.reshape(-1, self.input_dims) # N_features * N_frames * height * width
 
+        t = self.drop_layer1(t)
+
         t = self.fc1(t)
         t = F.relu(t)
 
-        t = self.drop_layer1(t)
+        t = self.drop_layer2(t)
 
         t = self.fc2(t)
         t = F.relu(t)
 
-        t = self.drop_layer1(t)
+        t = self.drop_layer3(t)
+
+        t = self.fc3(t)
+        t = F.relu(t)
 
         # output layer
         t = self.out(t)
-        t = F.softmax(t, dim=1)
+        # t = F.softmax(t, dim=1) # already a part of CrossEntropyLoss
 
         return t
+
+
