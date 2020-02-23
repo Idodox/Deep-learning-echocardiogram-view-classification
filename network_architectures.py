@@ -105,7 +105,85 @@ class SimpleNet(nn.Module):
 
 
 
+
 class cnn_3d_1(nn.Module):
+    def __init__(self, params):
+        super().__init__()
+
+        self.max_frames = params["max_frames"]
+        self.resolution = params["resolution"]
+        self.conv1_ch = params["conv1_ch"]
+        self.conv1_kernel = params["conv1_kernel"]
+        self.conv2_ch = params["conv2_ch"]
+        self.conv2_kernel = params["conv2_kernel"]
+        self.conv3_ch = params["conv3_ch"]
+        self.conv3_kernel = params["conv3_kernel"]
+        self.conv4_ch = params["conv4_ch"]
+        self.conv4_kernel = params["conv4_kernel"]
+        self.maxpool1_kernel = params['maxpool1_kernel']
+        self.maxpool2_kernel = params['maxpool2_kernel']
+        self.fc1_size = params["fc1_size"]
+        self.dropout1_ratio = params["dropout1_ratio"]
+        self.fc2_size = params["fc2_size"]
+        self.dropout2_ratio = params["dropout2_ratio"]
+        self.fc3_size = params["fc3_size"]
+        self.dropout3_ratio = params["dropout3_ratio"]
+        # self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+        self.features = nn.Sequential(
+            nn.Conv3d(in_channels=1, out_channels=self.conv1_ch, kernel_size=self.conv1_kernel),
+            nn.BatchNorm3d(num_features = self.conv1_ch),
+
+            # nn.Dropout3d(0.5),
+            nn.Conv3d(in_channels=self.conv1_ch, out_channels=self.conv2_ch, kernel_size=self.conv2_kernel),
+            nn.BatchNorm3d(num_features=self.conv2_ch),
+            # nn.MaxPool3d(self.maxpool1_kernel),
+            # nn.Dropout3d(0.5),
+            nn.Conv3d(in_channels=self.conv2_ch, out_channels=self.conv3_ch, kernel_size=self.conv3_kernel),
+            nn.BatchNorm3d(num_features=self.conv3_ch),
+            nn.Conv3d(in_channels=self.conv3_ch, out_channels=self.conv4_ch, kernel_size=self.conv4_kernel),
+            nn.BatchNorm3d(num_features=self.conv4_ch),
+            nn.MaxPool3d(self.maxpool2_kernel)
+        )
+
+
+        self.input_dims = self.calc_input_dims()
+
+        self.classifier = nn.Sequential(
+            nn.Linear(in_features = self.input_dims, out_features = self.fc1_size),
+            nn.ReLU(),
+            nn.Dropout(p= self.dropout1_ratio),
+            nn.Linear(in_features = self.fc1_size, out_features= self.fc2_size),
+            nn.ReLU(),
+            nn.Dropout(p= self.dropout2_ratio),
+            nn.Linear(in_features = self.fc2_size, out_features= self.fc3_size),
+            nn.ReLU(),
+            nn.Dropout(p= self.dropout3_ratio),
+            nn.Linear(in_features = self.fc3_size, out_features = 3)
+        )
+
+
+    def calc_input_dims(self):
+        # we don't care about result just shape so won't include activations and BN layers
+        batch_data = torch.zeros((1, 1, self.max_frames, self.resolution, self.resolution))
+        batch_data = self.features(batch_data)
+        return int(np.prod(batch_data.size()))
+
+    def forward(self, t):  # Forward transformation the network performs on tensors
+        # convert from ByteTensor (uint8) to float so we can run on CPU:
+        t = t.float()
+
+        t = self.features(t)
+        t = t.reshape(-1, self.input_dims) # N_features * N_frames * height * width
+        t = self.classifier(t)
+
+        # t = F.softmax(t, dim=1) # already a part of CrossEntropyLoss
+
+        return t
+
+
+
+class cnn_3d_2(nn.Module):
     def __init__(self, params):
         super().__init__()
 
@@ -217,5 +295,4 @@ class cnn_3d_1(nn.Module):
         # t = F.softmax(t, dim=1) # already a part of CrossEntropyLoss
 
         return t
-
 
