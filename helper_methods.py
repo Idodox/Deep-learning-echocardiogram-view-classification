@@ -8,6 +8,7 @@ import re
 import pickle
 from tqdm import tqdm
 from torch import max
+from sklearn.model_selection import KFold
 
 
 def get_num_correct(preds, labels):
@@ -109,6 +110,40 @@ def get_train_val_idx(data_set, random_state = 42):
 
     return train_idx, val_idx
 
+
+def get_cross_val_idx(data_set, n_splits = 5, random_state = 42):
+
+    movie_list = list()
+    label_list = list()
+
+    for (path, label) in data_set.samples:
+        movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+        if movie_name not in movie_list:
+            movie_list.append(movie_name)
+            label_list.append(label)
+
+    fold_indexes = []
+
+    cv = KFold(n_splits=5, random_state=random_state, shuffle=False)
+    for train_index, val_index in cv.split(movie_list):
+
+
+        X_train, X_val, y_train, y_val = movie_list[train_index], movie_list[val_index], label_list[train_index], label_list[val_index]
+
+        train_idx = list()
+        val_idx = list()
+
+        for i, (path, label) in enumerate(data_set.samples):
+            movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+            if movie_name in X_train:
+                train_idx.append(i)
+            elif movie_name in X_val:
+                val_idx.append(i)
+            else:
+                raise NameError("movie not in X_train or in X_val")
+        fold_indexes.append(train_idx, val_idx)
+
+    return fold_indexes
 
 
 from torchvision import datasets

@@ -120,8 +120,7 @@ class cnn_3d_1(nn.Module):
         self.conv3_kernel = params["conv3_kernel"]
         self.conv4_ch = params["conv4_ch"]
         self.conv4_kernel = params["conv4_kernel"]
-        self.maxpool1_kernel = params['maxpool1_kernel']
-        self.maxpool2_kernel = params['maxpool2_kernel']
+        self.last_maxpool_kernel = params['last_maxpool_kernel']
         self.fc1_size = params["fc1_size"]
         self.dropout1_ratio = params["dropout1_ratio"]
         self.fc2_size = params["fc2_size"]
@@ -133,17 +132,13 @@ class cnn_3d_1(nn.Module):
         self.features = nn.Sequential(
             nn.Conv3d(in_channels=1, out_channels=self.conv1_ch, kernel_size=self.conv1_kernel),
             nn.BatchNorm3d(num_features = self.conv1_ch),
-
-            # nn.Dropout3d(0.5),
             nn.Conv3d(in_channels=self.conv1_ch, out_channels=self.conv2_ch, kernel_size=self.conv2_kernel),
             nn.BatchNorm3d(num_features=self.conv2_ch),
-            # nn.MaxPool3d(self.maxpool1_kernel),
-            # nn.Dropout3d(0.5),
             nn.Conv3d(in_channels=self.conv2_ch, out_channels=self.conv3_ch, kernel_size=self.conv3_kernel),
             nn.BatchNorm3d(num_features=self.conv3_ch),
             nn.Conv3d(in_channels=self.conv3_ch, out_channels=self.conv4_ch, kernel_size=self.conv4_kernel),
             nn.BatchNorm3d(num_features=self.conv4_ch),
-            nn.MaxPool3d(self.maxpool2_kernel)
+            nn.MaxPool3d(self.last_maxpool_kernel)
         )
 
 
