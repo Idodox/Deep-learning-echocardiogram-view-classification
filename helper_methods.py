@@ -113,22 +113,23 @@ def get_train_val_idx(data_set, random_state = 42):
 
 def get_cross_val_idx(data_set, n_splits = 5, random_state = 42):
 
-    movie_list = list()
-    label_list = list()
+    movie_list = np.array([])
+    label_list = np.array([])
 
     for (path, label) in data_set.samples:
         movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
-        if movie_name not in movie_list:
-            movie_list.append(movie_name)
-            label_list.append(label)
+        if movie_name not in list(movie_list):
+            movie_list = np.append(movie_list, movie_name)
+            label_list = np.append(label_list, label)
 
     fold_indexes = []
 
-    cv = KFold(n_splits=5, random_state=random_state, shuffle=False)
+    cv = KFold(n_splits=5, random_state=random_state, shuffle=True)
     for train_index, val_index in cv.split(movie_list):
 
 
-        X_train, X_val, y_train, y_val = movie_list[train_index], movie_list[val_index], label_list[train_index], label_list[val_index]
+        X_train, X_val = movie_list[train_index], movie_list[val_index]
+        y_train, y_val = label_list[train_index], label_list[val_index]
 
         train_idx = list()
         val_idx = list()
@@ -141,7 +142,7 @@ def get_cross_val_idx(data_set, n_splits = 5, random_state = 42):
                 val_idx.append(i)
             else:
                 raise NameError("movie not in X_train or in X_val")
-        fold_indexes.append(train_idx, val_idx)
+        fold_indexes.append((train_idx, val_idx))
 
     return fold_indexes
 
