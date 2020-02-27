@@ -1,75 +1,61 @@
-import torch as T
+import torch
 import torch.nn as nn
-import torch.nn.functional as f
-import torch.optim as optim
-from torchvision.transforms import ToTensor
-import numpy as np
+from numpy import prod
 
 
 
-class CNNCell(nn.Module):
-    def __init__(self, input_channels, output_channels):
-        super(CNNCell, self).__init__()
-        self.conv = nn.Conv3d(in_channels=input_channels,
-                              kernel_size=3,
-                              output_channels=output_channels)
-        self.bn = nn.BatchNorm3d(num_features=output_channels)
-        self.relu = nn.Relu()
+class ModularCNN(nn.Module):
 
-        def forward(self, batch_data):
-            t = self.conv(batch_data)
-            t = self.bn(t)
-            t = self.relu(t)
+    def __init__(self, features, adaptive_pool=(6, 6, 6), fc1=256, fc2=256, num_classes=3, init_weights=True):
+        super(ModularCNN, self).__init__()
+        self.features = features
+        self.avgpool = nn.AdaptiveAvgPool3d(adaptive_pool)
+        self.classifier = nn.Sequential(
+            nn.Linear(64 * prod(adaptive_pool), fc1),
+            nn.ReLU(True),
+            nn.Dropout(0.5),
+            nn.Linear(fc1, fc2),
+            nn.ReLU(True),
+            nn.Dropout(0.5),
+            nn.Linear(fc2, num_classes),
+        )
+        if init_weights:
+            self._initialize_weights()
 
-            return t
+    def forward(self, x):
+        x = x.float()
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm3d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
 
 
-class Network(nn.Module):
-    def __init__(self, params):
-        super(Network, self).__init__()
+def make_layers(cfg, batch_norm=False):
+    layers = []
+    in_channels = 1
+    for v in cfg:
+        if v == 'M':
+            layers += [nn.MaxPool3d(kernel_size=2, stride=(1, 2, 2))]
+        else:
+            conv3d = nn.Conv3d(in_channels, v, kernel_size=3, padding=1)
+            if batch_norm:
+                layers += [conv3d, nn.BatchNorm3d(v), nn.ReLU(inplace=True)]
+            else:
+                layers += [conv3d, nn.ReLU(inplace=True)]
+            in_channels = v
+    return nn.Sequential(*layers)
 
-        # self.conv1_ch = params["conv1_ch"]
-        # self.conv1_kernel = params["conv1_kernel"]
-        # self.conv2_ch = params["conv2_ch"]
-        # self.conv2_kernel = params["conv2_kernel"]
-        # self.conv3_ch = params["conv3_ch"]
-        # self.conv3_kernel = params["conv3_kernel"]
-        # self.conv4_ch = params["conv4_ch"]
-        # self.conv4_kernel = params["conv4_kernel"]
-        # self.maxpool1_kernel = params["maxpool1_kernel"]
-        # self.fc1_size = params["fc1_size"]
-        # self.dropout1_ratio = params["dropout1_ratio"]
-        # self.fc2_size = params["fc2_size"]
-        # self.dropout2_ratio = params["dropout2_ratio"]
-        # self.fc3_size = params["fc3_size"]
-        # self.dropout3_ratio = params["dropout3_ratio"]
-
-        self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
-        self.features = nn.Sequential(CNNCell(input_channels=1, output_channels=32)
-                                     ,CNNCell(input_channels=32, output_channels=32)
-                                     ,CNNCell(input_channels=32, output_channels=32)
-                                     ,nn.MaxPool3d(kernel_size=2)
-                                     ,CNNCell(input_channels=32, output_channels=64)
-                                     ,CNNCell(input_channels=64, output_channels=64)
-                                     ,CNNCell(input_channels=64, output_channels=64)
-                                     ,nn.MaxPool3d(kernel_size=2)
-                                      )
-
-        self.classifier = nn.Sequential(nn.Dropout(0.5)
-                                       ,nn.Linear(128)
-                                       ,nn.ReLU() # arg inplace = True?
-                                       ,nn.Dropout(0.5)
-                                       ,nn.Linear(64)
-                                       ,nn.ReLU(inplace = True)
-                                        )
-
-        self.to(self.device)
-
-    def forward(self, batch_data):
-        batch_data = T.tensor(batch_data).to(self.device)
-
-        t = self.features(batch_data)
-        t = torch.flatten(t)
-        t = self.classifier(t)
-
-        return t
