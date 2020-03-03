@@ -6,18 +6,18 @@ from numpy import prod
 
 class ModularCNN(nn.Module):
 
-    def __init__(self, features, adaptive_pool=(6, 6, 6), fc1=256, fc2=256, num_classes=3, init_weights=True):
+    def __init__(self, features, classifier, adaptive_pool=(6, 6, 6), num_classes=3, init_weights=True):
         super(ModularCNN, self).__init__()
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool3d(adaptive_pool)
         self.classifier = nn.Sequential(
-            nn.Linear(64 * prod(adaptive_pool), fc1),
+            nn.Linear(features[-4].out_channels * prod(adaptive_pool), classifier[1]),
             nn.ReLU(True),
-            nn.Dropout(0.5),
-            nn.Linear(fc1, fc2),
+            nn.Dropout(classifier[0]),
+            nn.Linear(classifier[1], classifier[3]),
             nn.ReLU(True),
-            nn.Dropout(0.5),
-            nn.Linear(fc2, num_classes),
+            nn.Dropout(classifier[2]),
+            nn.Linear(classifier[3], num_classes),
         )
         if init_weights:
             self._initialize_weights()

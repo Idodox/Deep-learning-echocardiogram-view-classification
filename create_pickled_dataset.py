@@ -2,7 +2,7 @@ import numpy as np
 import os
 from PIL import Image
 import pickle
-from helper_methods import get_frame_sequences
+from torchutils import get_frame_sequences
 from tqdm import tqdm
 import re
 

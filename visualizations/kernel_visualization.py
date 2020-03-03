@@ -5,6 +5,7 @@ import torch
 from torch.optim import Adam
 from torchvision import models
 
+from modular_cnn import ModularCNN, make_layers
 from misc_functions import preprocess_image, recreate_image, save_image
 
 
@@ -34,9 +35,9 @@ class CNNLayerVisualization:
         # Hook the selected layer
         self.hook_layer()
         # Generate a random image
-        random_image = np.uint8(np.random.uniform(150, 180, (224, 224, 3)))
+        random_image = np.uint8(np.random.uniform(150, 180, (1, 10, 100, 100)))
         # Process image and return variable
-        processed_image = preprocess_image(random_image, False)
+        processed_image = preprocess_image(random_image)
         # Define optimizer for the image
         optimizer = Adam([processed_image], lr=0.1, weight_decay=1e-6)
         for i in range(1, 31):
@@ -111,10 +112,26 @@ class CNNLayerVisualization:
 
 
 if __name__ == '__main__':
+    hyper_params = {"adaptive_pool": (4, 4, 4)
+              , "features": [8, 'M', 16, 'M', 32, 'M', 64, 'M', 128, 'M']
+              , "classifier": [0.7, 256, 0.7, 256]
+             }
+
     cnn_layer = 17
     filter_pos = 5
-    # Fully connected layer is not needed
-    pretrained_model = models.vgg16(pretrained=True).features
+
+    from collections import OrderedDict
+
+    state_dict = torch.load("/Users/idofarhi/Documents/Thesis/Code/model.pt", map_location=torch.device('cpu'))
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = k[7:]  # remove 'module.' of dataparallel
+        new_state_dict[name] = v
+
+    pretrained_model = ModularCNN(make_layers(hyper_params["features"], batch_norm=True), classifier = hyper_params["classifier"], adaptive_pool=hyper_params["adaptive_pool"])
+    pretrained_model.load_state_dict(new_state_dict)
+    pretrained_model = pretrained_model.features
+
     layer_vis = CNNLayerVisualization(pretrained_model, cnn_layer, filter_pos)
 
     # Layer visualization with pytorch hooks
