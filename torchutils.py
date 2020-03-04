@@ -9,6 +9,7 @@ from torch import max
 from sklearn.model_selection import KFold
 import torch
 import shutil
+import random
 
 class DatasetFolderWithPaths(datasets.DatasetFolder):
     """Custom dataset that includes file paths. Extends
@@ -24,6 +25,94 @@ class DatasetFolderWithPaths(datasets.DatasetFolder):
         # make a new tuple that includes original and the path
         tuple_with_path = (original_tuple + (path,))
         return tuple_with_path
+
+class ToTensor(object):
+    """Convert a ``numpy.ndarray`` to tensor.
+    """
+
+    def __call__(self, arr):
+        """
+        Args:
+            numpy array to be converted to tensor.
+
+        Returns:
+            Tensor: Converted array.
+        """
+        return torch.from_numpy(arr)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
+
+class Normalize(object):
+    """Normalize a tensor image with mean and standard deviation.
+    Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform
+    will normalize each channel of the input ``torch.*Tensor`` i.e.
+    ``input[channel] = (input[channel] - mean[channel]) / std[channel]``
+
+    .. note::
+        This transform acts out of place, i.e., it does not mutates the input tensor.
+
+    Args:
+        mean (sequence): Sequence of means for each channel.
+        std (sequence): Sequence of standard deviations for each channel.
+        inplace(bool,optional): Bool to make this operation in-place.
+
+    """
+
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        """
+        Args:
+            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+
+        Returns:
+            Tensor: Normalized Tensor image.
+        """
+
+        new_tensor = tensor.clone()
+
+        dtype = tensor.dtype
+        mean = torch.as_tensor(self.mean, dtype=dtype, device=tensor.device)
+        std = torch.as_tensor(self.std, dtype=dtype, device=tensor.device)
+        for i, image in enumerate(tensor):
+            new_tensor[i] = image.sub_(mean).div_(std)
+        return new_tensor
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
+
+
+
+
+class RandomHorizontalFlip(object):
+    """Horizontally flip every frame in the set pending probability.
+
+    Args:
+        p (float): probability of the image being flipped. Default value is 0.5
+    """
+
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, clip):
+        """
+        Args:
+            clip (sequence of grayscale images): clip to be flipped.
+
+        Returns:
+            Randomly flipped image.
+        """
+        if random.random() < self.p:
+            for i, image in enumerate(clip):
+                clip[i] = torch.flip(image, [1])
+
+        return clip
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
 def get_num_correct(preds, labels):
@@ -225,7 +314,7 @@ def calc_accuracy(prediction_list):
     return np.round(num_correct/video_count*100, 23)
 
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename='checkpoint.pt.tar'):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        shutil.copyfile(filename, 'model_best.pt.tar')

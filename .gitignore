@@ -2,6 +2,13 @@
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 
+
+# generated images
+generated
+
+#pycharm models
+*.pt
+
 # IPython
 profile_default/
 ipython_config.py
