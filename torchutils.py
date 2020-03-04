@@ -7,6 +7,8 @@ import pickle
 from tqdm import tqdm
 from torch import max
 from sklearn.model_selection import KFold
+import torch
+import shutil
 
 class DatasetFolderWithPaths(datasets.DatasetFolder):
     """Custom dataset that includes file paths. Extends
@@ -97,7 +99,7 @@ def get_mistakes(preds, labels, paths):
     return mistakes
 
 
-def get_train_val_idx(data_set, random_state = 42):
+def get_train_val_idx(data_set, random_state):
     # Separate data set into movie names so we can split by movie:
     movie_list = list()
     label_list = list()
@@ -122,10 +124,15 @@ def get_train_val_idx(data_set, random_state = 42):
         else:
             raise NameError("movie not in X_train or in X_val")
 
+    # Make sure train and val indexes aren't mixed up
+    for index in train_idx:
+        assert(index not in val_idx)
+
     return train_idx, val_idx
 
 
-def get_cross_val_idx(data_set, n_splits = 5, random_state = 42):
+def get_cross_val_idx(data_set, random_state, n_splits = 5):
+    # TODO: add assertion to make sure indexes in train are not in val.
 
     movie_list = np.array([])
     label_list = np.array([])
@@ -217,3 +224,8 @@ def calc_accuracy(prediction_list):
 
     return np.round(num_correct/video_count*100, 23)
 
+
+def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, 'model_best.pth.tar')

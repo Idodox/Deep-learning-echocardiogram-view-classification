@@ -18,7 +18,7 @@ print('CUDA enabled:', torch.backends.cudnn.enabled)
 
 log_data = True
 
-
+#TODO: update get_cross_val_idx with "random_state" (from hyper params)
 hyper_params = {"learning_rate": 0.00001
                ,"n_epochs": 100
                ,"batch_size": 50
