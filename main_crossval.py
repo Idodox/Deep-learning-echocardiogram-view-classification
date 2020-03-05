@@ -10,7 +10,9 @@ from pathlib import Path
 
 from model_architectures import cnn_3d_1
 from torchsummary import summary
-from torchutils import pickle_loader, get_num_correct, get_train_val_idx, DatasetFolderWithPaths, get_mistakes, online_mean_and_std, calc_accuracy, get_cross_val_idx
+from torchutils import pickle_loader, DatasetFolderWithPaths
+from utils import get_num_correct, get_mistakes, get_train_val_idx, get_cross_val_idx, online_mean_and_std, \
+    calc_accuracy
 
 torch.backends.cudnn.benchmark=True
 print('CUDA available:', torch.cuda.is_available())
