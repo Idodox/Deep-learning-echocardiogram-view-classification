@@ -5,6 +5,7 @@ import torch
 from torch.optim import Adam
 from torchvision import models
 
+import torchutils
 from modular_cnn import ModularCNN, make_layers
 from vis_utils import preprocess_image, recreate_image, save_image
 
@@ -16,7 +17,7 @@ class CNNLayerVisualization:
     """
     def __init__(self, model, selected_layer, selected_filter):
         self.model = model
-        self.model.eval()
+        torchutils.eval()
         self.selected_layer = selected_layer
         self.selected_filter = selected_filter
         self.conv_output = 0

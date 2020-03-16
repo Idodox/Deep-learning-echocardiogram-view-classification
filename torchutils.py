@@ -1,8 +1,12 @@
+from torch import nn as nn
 from torchvision import datasets
 import pickle
 import torch
 import shutil
 import random
+
+from utils import get_num_correct, get_mistakes, calc_accuracy
+
 
 class DatasetFolderWithPaths(datasets.DatasetFolder):
     """Custom dataset that includes file paths. Extends
@@ -181,3 +185,107 @@ def save_checkpoint(state, is_best, filename='checkpoint.pt.tar'):
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, 'model_best.pt.tar')
+
+
+
+def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model, log_number_train):
+    total_train_loss = 0
+    total_train_correct = 0
+    incorrect_classifications_train = []
+    epoch_classifications_train = []
+    model.train()
+    for batch_number, (images, labels, paths) in enumerate(train_loader):
+
+        # for i, (image, label, path) in enumerate(zip(images, labels, paths)):
+        #     save_plot_clip_frames(image, label, path, added_info_to_path = epoch)
+
+        images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
+        labels = labels.long()
+
+        if torch.cuda.is_available():
+            images, labels = images.cuda(), labels.cuda()
+
+        optimizer.zero_grad()  # Whenever pytorch calculates gradients it always adds it to whatever it has, so we need to reset it each batch.
+        preds = model(images)  # Pass Batch
+
+        loss = criterion(preds, labels)  # Calculate Loss
+        total_train_loss += loss.item()
+        loss.backward()  # Calculate Gradients - the gradient is the direction we need to move towards the loss function minimum (LR will tell us how far to step)
+        optimizer.step()  # Update Weights - the optimizer is able to update the weights because we passed it the weights as an argument in line 4.
+
+        num_correct = get_num_correct(preds, labels)
+        total_train_correct += num_correct
+
+        if log_data:
+            experiment.log_metric("Train batch accuracy", num_correct / len(labels) * 100, step=log_number_train)
+            experiment.log_metric("Avg train batch loss", loss.item(), step=log_number_train)
+        log_number_train += 1
+
+        # print('Train: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct/len(labels)), 'Loss:', loss.item())
+        incorrect_classifications_train.append(get_mistakes(preds, labels, paths))
+        for prediction in zip(preds, labels, paths):
+            epoch_classifications_train.append(prediction)
+    epoch_accuracy = calc_accuracy(epoch_classifications_train)
+    if log_data:
+        experiment.log_metric("Train epoch accuracy", epoch_accuracy, step=epoch)
+        experiment.log_metric("Avg train epoch loss", total_train_loss / batch_number, step=epoch)
+    print('Train: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', str(epoch_accuracy) + '%')
+
+    return
+
+
+def eval(epoch, train_loader, optimizer, criterion, log_data, experiment, model, log_number_val):
+    incorrect_classifications_val = []
+    total_val_loss = 0
+    total_val_correct = 0
+    best_val_acc = 0
+    epoch_classifications_val = []
+    model.eval()
+    with torch.no_grad():
+        for batch_number, (images, labels, paths) in enumerate(val_loader):
+            images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
+            labels = labels.long()
+
+            if torch.cuda.is_available():
+                images, labels = images.cuda(), labels.cuda()
+
+            preds = model(images)  # Pass Batch
+            loss = criterion(preds, labels)  # Calculate Loss
+            total_val_loss += loss.item()
+
+            num_correct = get_num_correct(preds, labels)
+            total_val_correct += num_correct
+
+            if log_data:
+                experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=log_number_val)
+                experiment.log_metric("Avg val batch loss", loss.item(), step=log_number_val)
+            log_number_val += 1
+
+            # print('Val: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct / len(labels)), 'Loss:', loss.item())
+            # print_mistakes(preds, labels, paths)
+
+            incorrect_classifications_val.append(get_mistakes(preds, labels, paths))
+
+            for prediction in zip(preds, labels, paths):
+                epoch_classifications_val.append(prediction)
+
+        epoch_accuracy = calc_accuracy(epoch_classifications_val)
+
+        if log_data:
+            experiment.log_metric("Val epoch accuracy", epoch_accuracy, step=epoch)
+            experiment.log_metric("Avg val epoch loss", total_val_loss / batch_number, step=epoch)
+        print('Val Epoch:', epoch, 'num correct:', total_val_correct, 'Accuracy:', str(epoch_accuracy) + '%')
+
+    if epoch >= hyper_params['n_epochs'] - 1:
+        print('TRAIN MISCLASSIFICATIONS:')
+        print(incorrect_classifications_train)
+        print('TEST MISCLASSIFICATIONS:')
+        print(incorrect_classifications_val)
+    is_best = epoch_accuracy > best_val_acc
+    best_val_acc = max(epoch_accuracy, best_val_acc)
+    save_checkpoint({
+        'epoch': epoch + 1,
+        'state_dict': model.state_dict(),
+        'best_acc1': best_val_acc,
+        'optimizer': optimizer.state_dict(),
+    }, is_best)
