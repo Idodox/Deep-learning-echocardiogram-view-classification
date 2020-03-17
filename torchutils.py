@@ -4,8 +4,8 @@ import pickle
 import torch
 import shutil
 import random
-
 from utils import get_num_correct, get_mistakes, calc_accuracy
+import numpy as np
 
 
 class DatasetFolderWithPaths(datasets.DatasetFolder):
@@ -52,7 +52,6 @@ class Normalize(object):
     Args:
         mean (sequence): Sequence of means for each channel.
         std (sequence): Sequence of standard deviations for each channel.
-        inplace(bool,optional): Bool to make this operation in-place.
 
     """
 
@@ -164,7 +163,7 @@ class RandomHorizontalFlip(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-def pickle_loader(path, min_frames = None):
+def pickle_loader(path, min_frames = None, shuffle_frames = False):
     """
     :param path: path to pickle file
     :return: opens the file and returns the un-pickled file
@@ -175,7 +174,10 @@ def pickle_loader(path, min_frames = None):
     file = file / 255
     if min_frames is not None:
         assert len(file) >= min_frames # Assert file has at least (max_frames) number of frames.
-        return file[:min_frames]
+        file = file[:min_frames]
+    # this option was added to ascertain weather the net uses frame order to determine classification.
+    if shuffle_frames:
+        np.random.shuffle(file)
     return file
     # except:
     #     print('Loading pickle file failed. path:', path)
@@ -231,10 +233,10 @@ def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model
         experiment.log_metric("Avg train epoch loss", total_train_loss / batch_number, step=epoch)
     print('Train: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
-    return
+    return log_number_train
 
 
-def eval(epoch, train_loader, optimizer, criterion, log_data, experiment, model, log_number_val):
+def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, model, log_number_val):
     incorrect_classifications_val = []
     total_val_loss = 0
     total_val_correct = 0
@@ -276,11 +278,11 @@ def eval(epoch, train_loader, optimizer, criterion, log_data, experiment, model,
             experiment.log_metric("Avg val epoch loss", total_val_loss / batch_number, step=epoch)
         print('Val Epoch:', epoch, 'num correct:', total_val_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
-    if epoch >= hyper_params['n_epochs'] - 1:
-        print('TRAIN MISCLASSIFICATIONS:')
-        print(incorrect_classifications_train)
-        print('TEST MISCLASSIFICATIONS:')
-        print(incorrect_classifications_val)
+    # if epoch >= hyper_params['n_epochs'] - 1:
+    #     print('TRAIN MISCLASSIFICATIONS:')
+    #     print(incorrect_classifications_train)
+    #     print('TEST MISCLASSIFICATIONS:')
+    #     print(incorrect_classifications_val)
     is_best = epoch_accuracy > best_val_acc
     best_val_acc = max(epoch_accuracy, best_val_acc)
     save_checkpoint({
@@ -289,3 +291,5 @@ def eval(epoch, train_loader, optimizer, criterion, log_data, experiment, model,
         'best_acc1': best_val_acc,
         'optimizer': optimizer.state_dict(),
     }, is_best)
+
+    return log_number_val
