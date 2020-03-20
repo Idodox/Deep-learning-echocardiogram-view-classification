@@ -11,15 +11,15 @@ from utils import get_frame_sequences, mkdir_if_missing, get_files_list, load_an
 view_list = ['apex', 'mitral', 'papillary']
 # view_list = ['papillary']
 step_size = 3
-min_frames = 10
+min_frames = 16
 
 source_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/apex',
                     'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/mitral',
                     'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/papillary'}
 
-target_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps/apex',
-                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps/mitral',
-                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps/papillary'}
+target_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/apex',
+                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/mitral',
+                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/papillary'}
 
 #################################################
 
