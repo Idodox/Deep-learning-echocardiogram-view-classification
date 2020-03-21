@@ -9,6 +9,8 @@ generated
 #pycharm models
 *.pt
 *.pt.tar
+*.pth
+
 
 # IPython
 profile_default/

@@ -12,14 +12,15 @@ view_list = ['apex', 'mitral', 'papillary']
 # view_list = ['papillary']
 step_size = 3
 min_frames = 16
+final_dim = 112
 
-source_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/apex',
-                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/mitral',
-                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/papillary'}
+source_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/color/apex',
+                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/color/mitral',
+                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/color/papillary'}
 
-target_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/apex',
-                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/mitral',
-                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/papillary'}
+target_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '_color/apex',
+                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '_color/mitral',
+                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '_color/papillary'}
 
 #################################################
 
@@ -65,7 +66,7 @@ for view in view_list:
 
             frame_list = sorted(frame_list, key=lambda x: int(re.search(r'(?<=_)[\d]+', file).group()))
             # load and process images from list
-            image_array = load_and_process_images(source_directory[view], frame_list, to_numpy=True)
+            image_array = load_and_process_images(source_directory[view], frame_list, to_numpy=True, resize_dim = final_dim)
             # output is a numpy array of frames
 
             # save image set as pickle

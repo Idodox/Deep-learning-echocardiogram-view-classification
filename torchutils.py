@@ -190,7 +190,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pt.tar'):
 
 
 
-def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model, log_number_train):
+def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model, log_number_train, grayscale = True):
     total_train_loss = 0
     total_train_correct = 0
     incorrect_classifications_train = []
@@ -201,7 +201,10 @@ def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model
         # for i, (image, label, path) in enumerate(zip(images, labels, paths)):
         #     save_plot_clip_frames(image, label, path, added_info_to_path = epoch)
 
-        images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
+        if grayscale:
+            images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
+        else:
+            images = images.transpose(1, 4).float()
         labels = labels.long()
 
         if torch.cuda.is_available():
@@ -236,7 +239,7 @@ def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model
     return log_number_train
 
 
-def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, model, log_number_val):
+def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, model, log_number_val, grayscale = True):
     incorrect_classifications_val = []
     total_val_loss = 0
     total_val_correct = 0
@@ -245,8 +248,13 @@ def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, mode
     model.eval()
     with torch.no_grad():
         for batch_number, (images, labels, paths) in enumerate(val_loader):
-            images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
+
+            if grayscale:
+                images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
+            else:
+                images = images.transpose(1, 4).float()
             labels = labels.long()
+
 
             if torch.cuda.is_available():
                 images, labels = images.cuda(), labels.cuda()
