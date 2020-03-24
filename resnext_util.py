@@ -3,7 +3,7 @@ from torch import nn
 import resnext
 
 
-def generate_resnext_model(mode, model_depth = 101, n_classes = 3, sample_size = 112, sample_duration = 16, resnet_shortcut = 'A', resnext_cardinality = 32):
+def generate_resnext_model(mode, model_depth = 101, n_classes = 400, sample_size = 112, sample_duration = 16, resnet_shortcut = 'B', resnext_cardinality = 32):
     assert mode in ['score', 'feature']
     if mode == 'score':
         last_fc = True

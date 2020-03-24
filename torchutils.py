@@ -4,8 +4,10 @@ import pickle
 import torch
 import shutil
 import random
+from modular_cnn import ModularCNN, make_layers
 from utils import get_num_correct, get_mistakes, calc_accuracy
 import numpy as np
+from resnext_util import generate_resnext_model
 
 
 class DatasetFolderWithPaths(datasets.DatasetFolder):
@@ -204,7 +206,7 @@ def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model
         if grayscale:
             images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
         else:
-            images = images.transpose(1, 4).float()
+            images = images.float().permute(0, 4, 1, 2, 3).float()
         labels = labels.long()
 
         if torch.cuda.is_available():
@@ -252,7 +254,7 @@ def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, mode
             if grayscale:
                 images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
             else:
-                images = images.transpose(1, 4).float()
+                images = images.float().permute(0, 4, 1, 2, 3).float()
             labels = labels.long()
 
 
@@ -301,3 +303,27 @@ def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, mode
     }, is_best)
 
     return log_number_val
+
+
+def get_resnext():
+    model = generate_resnext_model('score') # in score, last_ft=True, in feature, last_fc=False
+    model = nn.DataParallel(model).cuda(0)
+    print('loading resnext model')
+    model_data = torch.load('resnext-101-64f-kinetics.pth')
+    model.load_state_dict(model_data['state_dict'])
+    for param in model.parameters():
+        param.requires_grad = False
+    # Parameters of newly constructed modules have requires_grad=True by default
+    model.module.fc = nn.Linear(2048, 3)
+    model.to(torch.device('cuda:0'))
+    return model
+
+
+def get_modular_3dCNN(hyper_params):
+    model = ModularCNN(make_layers(hyper_params["features"], batch_norm=True), classifier = hyper_params["classifier"], adaptive_pool=hyper_params["adaptive_pool"])
+    if torch.cuda.is_available():
+        model = model.cuda()
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        model = nn.DataParallel(model).cuda(0)
+    return model
