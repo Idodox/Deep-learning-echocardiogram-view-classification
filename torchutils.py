@@ -305,7 +305,7 @@ def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, mode
     return log_number_val
 
 
-def get_resnext():
+def get_resnext(hyper_params):
     model = generate_resnext_model('score') # in score, last_ft=True, in feature, last_fc=False
     model = nn.DataParallel(model).cuda(0)
     print('loading resnext model')
@@ -314,13 +314,15 @@ def get_resnext():
     for param in model.parameters():
         param.requires_grad = False
     # Parameters of newly constructed modules have requires_grad=True by default
-    model.module.fc = nn.Linear(2048, 3)
+    num_classes = len(hyper_params['classes'])
+    model.module.fc = nn.Linear(2048, num_classes)
     model.to(torch.device('cuda:0'))
     return model
 
 
 def get_modular_3dCNN(hyper_params):
-    model = ModularCNN(make_layers(hyper_params["features"], batch_norm=True), classifier = hyper_params["classifier"], adaptive_pool=hyper_params["adaptive_pool"])
+    num_classes = len(hyper_params['classes'])
+    model = ModularCNN(make_layers(hyper_params["features"], batch_norm=True), classifier = hyper_params["classifier"], adaptive_pool=hyper_params["adaptive_pool"], num_classes = num_classes)
     if torch.cuda.is_available():
         model = model.cuda()
     if torch.cuda.device_count() > 1:

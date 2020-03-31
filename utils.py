@@ -46,15 +46,13 @@ def get_num_correct(preds, labels):
     return preds.argmax(dim=1).eq(labels).sum().item()
 
 
-def get_frame_sequences(frames_folder_path):
+def get_frame_sequences(frames_folder_path, class_folders = ['apex', 'papillary', 'mitral']):
     """
     This function accepts the path for the frames folder (which should contain the frames for
     all videos separated into different folders.
 
     returns a nested dictionary of classes, in each class the keys are video name and value is max number of frames.
     """
-
-    class_folders = ['apex', 'papillary', 'mitral']
 
     files = {}
     for class_name in class_folders:
@@ -65,9 +63,10 @@ def get_frame_sequences(frames_folder_path):
         # print(file_names)
         try:
             for file in file_names:
-                file_name = re.match(".+?(?=_)", file).group()
+                if file == '.DS_Store': continue
+                file_name = re.match(r".+(?=_\d+\.jpg)", file).group()
 
-                frame_number = re.search("(?<=_)[\d]+", file).group()
+                frame_number = re.search(r"(?<=_)[\d]+(?=\.jpg)", file).group()
                 assert(frame_number.isdigit())
                 frame_number = int(frame_number)
 
