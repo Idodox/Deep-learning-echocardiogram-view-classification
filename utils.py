@@ -103,7 +103,7 @@ def get_train_val_idx(data_set, random_state, test_size = 0.2):
     label_list = list()
 
     for (path, label) in data_set.samples:
-        movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+        movie_name = re.search('.+(?=_\d+\.jpg)', path).group()
         if movie_name not in movie_list:
             movie_list.append(movie_name)
             label_list.append(label)
@@ -114,7 +114,7 @@ def get_train_val_idx(data_set, random_state, test_size = 0.2):
     train_idx = list()
     val_idx = list()
     for i, (path, label) in enumerate(data_set.samples):
-        movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+        movie_name = re.search('.+(?=_\d+\.jpg)', path).group()
         if movie_name in X_train:
             train_idx.append(i)
         elif movie_name in X_val:
@@ -136,7 +136,7 @@ def get_cross_val_idx(data_set, random_state, n_splits = 5):
     label_list = np.array([])
 
     for (path, label) in data_set.samples:
-        movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+        movie_name = re.search('.+(?=_\d+\.jpg)', path).group()
         if movie_name not in list(movie_list):
             movie_list = np.append(movie_list, movie_name)
             label_list = np.append(label_list, label)
@@ -154,7 +154,7 @@ def get_cross_val_idx(data_set, random_state, n_splits = 5):
         val_idx = list()
 
         for i, (path, label) in enumerate(data_set.samples):
-            movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+            movie_name = re.search('.+(?=_\d+\.jpg)', path).group()
             if movie_name in X_train:
                 train_idx.append(i)
             elif movie_name in X_val:
@@ -202,7 +202,7 @@ def calc_accuracy(prediction_list):
         # get index of max prediction
         pred = max(pred, 0)[1].item()
         true = true.item()
-        file_name = re.search('[ \w-]+?(?=_\d)', path).group()
+        file_name = re.search('.+(?=_\d+\.jpg)', path).group()
 
         # if the movie is not in prediction_dict add it if it is then add the prediction to it.
 
@@ -233,7 +233,7 @@ def find_majority(votes):
     return top_two[0][0]
 
 def save_plot_clip_frames(clip, label, path, target_folder ="clip_plots", added_info_to_path = ""):
-    movie_name = re.search('[ \w-]+?(?=_\d)', path).group()
+    movie_name = re.search('.+(?=_\d+\.jpg)', path).group()
     try: # this is in case label is not a tensor and doesn't have ".item()"
         view_class = str(label.item())
     except(AttributeError):
@@ -290,7 +290,7 @@ def load_and_process_images(folder, frame_list, crop_size = 300, resize_dim = 10
 
 def save_image_sequence(frame_list, source_directory, view, target_directory, video, clip_number):
     # sort frames
-    sorted_frame_list = sorted(frame_list, key=lambda x: int(re.search(r'(?<=_)[\d]+', x).group()))
+    sorted_frame_list = sorted(frame_list, key=lambda x: int(re.search(r'(?<=_)[\d]+(?=\.jpg)', x).group()))
     # process images and convert to numpy array
     image_array = load_and_process_images(source_directory[view], sorted_frame_list, to_numpy=True)
     # save image set as pickle
