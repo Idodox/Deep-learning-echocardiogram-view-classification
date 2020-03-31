@@ -192,7 +192,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pt.tar'):
 
 
 
-def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model, log_number_train, grayscale = True):
+def train(epoch, train_loader, optimizer, criterion, experiment, model, log_number_train, grayscale = True):
     total_train_loss = 0
     total_train_correct = 0
     incorrect_classifications_train = []
@@ -223,9 +223,8 @@ def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model
         num_correct = get_num_correct(preds, labels)
         total_train_correct += num_correct
 
-        if log_data:
-            experiment.log_metric("Train batch accuracy", num_correct / len(labels) * 100, step=log_number_train)
-            experiment.log_metric("Avg train batch loss", loss.item(), step=log_number_train)
+        experiment.log_metric("Train batch accuracy", num_correct / len(labels) * 100, step=log_number_train)
+        experiment.log_metric("Avg train batch loss", loss.item(), step=log_number_train)
         log_number_train += 1
 
         # print('Train: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct/len(labels)), 'Loss:', loss.item())
@@ -233,15 +232,15 @@ def train(epoch, train_loader, optimizer, criterion, log_data, experiment, model
         for prediction in zip(preds, labels, paths):
             epoch_classifications_train.append(prediction)
     epoch_accuracy = calc_accuracy(epoch_classifications_train)
-    if log_data:
-        experiment.log_metric("Train epoch accuracy", epoch_accuracy, step=epoch)
-        experiment.log_metric("Avg train epoch loss", total_train_loss / batch_number, step=epoch)
+
+    experiment.log_metric("Train epoch accuracy", epoch_accuracy, step=epoch)
+    experiment.log_metric("Avg train epoch loss", total_train_loss / batch_number, step=epoch)
     print('Train: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
     return log_number_train
 
 
-def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, model, log_number_val, grayscale = True):
+def evaluate(epoch, val_loader, optimizer, criterion, experiment, model, log_number_val, grayscale = True):
     incorrect_classifications_val = []
     total_val_loss = 0
     total_val_correct = 0
@@ -268,9 +267,8 @@ def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, mode
             num_correct = get_num_correct(preds, labels)
             total_val_correct += num_correct
 
-            if log_data:
-                experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=log_number_val)
-                experiment.log_metric("Avg val batch loss", loss.item(), step=log_number_val)
+            experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=log_number_val)
+            experiment.log_metric("Avg val batch loss", loss.item(), step=log_number_val)
             log_number_val += 1
 
             # print('Val: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct / len(labels)), 'Loss:', loss.item())
@@ -283,9 +281,8 @@ def evaluate(epoch, val_loader, optimizer, criterion, log_data, experiment, mode
 
         epoch_accuracy = calc_accuracy(epoch_classifications_val)
 
-        if log_data:
-            experiment.log_metric("Val epoch accuracy", epoch_accuracy, step=epoch)
-            experiment.log_metric("Avg val epoch loss", total_val_loss / batch_number, step=epoch)
+        experiment.log_metric("Val epoch accuracy", epoch_accuracy, step=epoch)
+        experiment.log_metric("Avg val epoch loss", total_val_loss / batch_number, step=epoch)
         print('Val Epoch:', epoch, 'num correct:', total_val_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
     # if epoch >= hyper_params['n_epochs'] - 1:
@@ -324,8 +321,9 @@ def get_modular_3dCNN(hyper_params):
     num_classes = len(hyper_params['classes'])
     model = ModularCNN(make_layers(hyper_params["features"], batch_norm=True), classifier = hyper_params["classifier"], adaptive_pool=hyper_params["adaptive_pool"], num_classes = num_classes)
     if torch.cuda.is_available():
-        model = model.cuda()
+        model = model.cuda(0)
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = nn.DataParallel(model).cuda(0)
+    model.to(torch.device('cuda:0'))
     return model
