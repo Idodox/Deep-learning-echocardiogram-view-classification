@@ -4,6 +4,7 @@ import pickle
 import torch
 import shutil
 import random
+from comet_ml import Experiment
 from modular_cnn import ModularCNN, make_layers
 from utils import get_num_correct, get_mistakes, calc_accuracy
 import numpy as np
@@ -192,18 +193,18 @@ def save_checkpoint(state, is_best, filename='checkpoint.pt.tar'):
 
 
 
-def train(epoch, train_loader, optimizer, criterion, experiment, model, log_number_train, grayscale = True):
+def train(epoch, run):
     total_train_loss = 0
     total_train_correct = 0
     incorrect_classifications_train = []
     epoch_classifications_train = []
-    model.train()
-    for batch_number, (images, labels, paths) in enumerate(train_loader):
+    run.model.train()
+    for batch_number, (images, labels, paths) in enumerate(run.train_loader):
 
         # for i, (image, label, path) in enumerate(zip(images, labels, paths)):
         #     save_plot_clip_frames(image, label, path, added_info_to_path = epoch)
 
-        if grayscale:
+        if run.grayscale:
             images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
         else:
             images = images.float().permute(0, 4, 1, 2, 3).float()
@@ -212,20 +213,20 @@ def train(epoch, train_loader, optimizer, criterion, experiment, model, log_numb
         if torch.cuda.is_available():
             images, labels = images.cuda(), labels.cuda()
 
-        optimizer.zero_grad()  # Whenever pytorch calculates gradients it always adds it to whatever it has, so we need to reset it each batch.
-        preds = model(images)  # Pass Batch
+        run.optimizer.zero_grad()  # Whenever pytorch calculates gradients it always adds it to whatever it has, so we need to reset it each batch.
+        preds = run.model(images)  # Pass Batch
 
-        loss = criterion(preds, labels)  # Calculate Loss
+        loss = run.criterion(preds, labels)  # Calculate Loss
         total_train_loss += loss.item()
         loss.backward()  # Calculate Gradients - the gradient is the direction we need to move towards the loss function minimum (LR will tell us how far to step)
-        optimizer.step()  # Update Weights - the optimizer is able to update the weights because we passed it the weights as an argument in line 4.
+        run.optimizer.step()  # Update Weights - the optimizer is able to update the weights because we passed it the weights as an argument in line 4.
 
         num_correct = get_num_correct(preds, labels)
         total_train_correct += num_correct
 
-        experiment.log_metric("Train batch accuracy", num_correct / len(labels) * 100, step=log_number_train)
-        experiment.log_metric("Avg train batch loss", loss.item(), step=log_number_train)
-        log_number_train += 1
+        run.experiment.log_metric("Train batch accuracy", num_correct / len(labels) * 100, step=run.log_number_train)
+        run.experiment.log_metric("Avg train batch loss", loss.item(), step=run.log_number_train)
+        run.log_number_train += 1
 
         # print('Train: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct/len(labels)), 'Loss:', loss.item())
         incorrect_classifications_train.append(get_mistakes(preds, labels, paths))
@@ -233,43 +234,40 @@ def train(epoch, train_loader, optimizer, criterion, experiment, model, log_numb
             epoch_classifications_train.append(prediction)
     epoch_accuracy = calc_accuracy(epoch_classifications_train)
 
-    experiment.log_metric("Train epoch accuracy", epoch_accuracy, step=epoch)
-    experiment.log_metric("Avg train epoch loss", total_train_loss / batch_number, step=epoch)
-    print('Train: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', str(epoch_accuracy) + '%')
-
-    return log_number_train
+    run.experiment.log_metric("Train epoch accuracy", epoch_accuracy, step=epoch)
+    run.experiment.log_metric("Avg train epoch loss", total_train_loss / batch_number, step=epoch)
+    print('\nTrain: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
 
-def evaluate(epoch, val_loader, optimizer, criterion, experiment, model, log_number_val, grayscale = True):
+def evaluate(epoch, run):
     incorrect_classifications_val = []
     total_val_loss = 0
     total_val_correct = 0
     best_val_acc = 0
     epoch_classifications_val = []
-    model.eval()
+    run.model.eval()
     with torch.no_grad():
-        for batch_number, (images, labels, paths) in enumerate(val_loader):
+        for batch_number, (images, labels, paths) in enumerate(run.val_loader):
 
-            if grayscale:
+            if run.grayscale:
                 images = torch.unsqueeze(images, 1).double()  # added channel dimensions (grayscale)
             else:
                 images = images.float().permute(0, 4, 1, 2, 3).float()
             labels = labels.long()
 
-
             if torch.cuda.is_available():
                 images, labels = images.cuda(), labels.cuda()
 
-            preds = model(images)  # Pass Batch
-            loss = criterion(preds, labels)  # Calculate Loss
+            preds = run.model(images)  # Pass Batch
+            loss = run.criterion(preds, labels)  # Calculate Loss
             total_val_loss += loss.item()
 
             num_correct = get_num_correct(preds, labels)
             total_val_correct += num_correct
 
-            experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=log_number_val)
-            experiment.log_metric("Avg val batch loss", loss.item(), step=log_number_val)
-            log_number_val += 1
+            run.experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=run.log_number_val)
+            run.experiment.log_metric("Avg val batch loss", loss.item(), step=run.log_number_val)
+            run.log_number_val += 1
 
             # print('Val: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct / len(labels)), 'Loss:', loss.item())
             # print_mistakes(preds, labels, paths)
@@ -281,8 +279,8 @@ def evaluate(epoch, val_loader, optimizer, criterion, experiment, model, log_num
 
         epoch_accuracy = calc_accuracy(epoch_classifications_val)
 
-        experiment.log_metric("Val epoch accuracy", epoch_accuracy, step=epoch)
-        experiment.log_metric("Avg val epoch loss", total_val_loss / batch_number, step=epoch)
+        run.experiment.log_metric("Val epoch accuracy", epoch_accuracy, step=epoch)
+        run.experiment.log_metric("Avg val epoch loss", total_val_loss / batch_number, step=epoch)
         print('Val Epoch:', epoch, 'num correct:', total_val_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
     # if epoch >= hyper_params['n_epochs'] - 1:
@@ -290,16 +288,17 @@ def evaluate(epoch, val_loader, optimizer, criterion, experiment, model, log_num
     #     print(incorrect_classifications_train)
     #     print('TEST MISCLASSIFICATIONS:')
     #     print(incorrect_classifications_val)
-    is_best = epoch_accuracy > best_val_acc
-    best_val_acc = max(epoch_accuracy, best_val_acc)
+    is_best = epoch_accuracy > run.best_val_acc
+    if is_best:
+        print("Best run so far! updating params...")
+        run.best_val_acc = epoch_accuracy
+        run.best_model_preds = epoch_classifications_val
     save_checkpoint({
         'epoch': epoch + 1,
-        'state_dict': model.state_dict(),
-        'best_acc1': best_val_acc,
-        'optimizer': optimizer.state_dict(),
+        'state_dict': run.model.state_dict(),
+        'best_acc1': run.best_val_acc,
+        'optimizer': run.optimizer.state_dict(),
     }, is_best)
-
-    return log_number_val
 
 
 def get_resnext(hyper_params):
