@@ -16,6 +16,7 @@ from matplotlib import use
 use('agg')
 from matplotlib import gridspec
 import math
+from sklearn.metrics import confusion_matrix
 
 
 
@@ -189,40 +190,71 @@ def online_mean_and_std(loader):
     print(pixel_std)
 
 
-def calc_accuracy(prediction_list):
+def calc_accuracy(prediction_list, method = 'sum_predictions'):
     """
     receives the predictions for a full epoch of videos. Assuming each video has at least 5 mini-clips,
     runs majority vote per video and finally calculates the accuracy.
     tie counts as mistake.
+    method argument: 'individual' - predict the outcome for each video independently. Then do majority vote
+                     'sum_predictions' - take the sum of predictions for all classes then use argmax to get prediction
     """
-    # prediction_dict is a dictionary that aggregates videos and their predictions.
-    predictions_dict = {}
-    # preprocessing
-    for (pred, true, path) in prediction_list:
-        # get index of max prediction
-        pred = max(pred, 0)[1].item()
-        true = true.item()
-        file_name = re.search('.+(?=_\d+\.pickle)', path).group()
 
-        # if the movie is not in prediction_dict add it if it is then add the prediction to it.
+    if method == 'individual':
+        # prediction_dict is a dictionary that aggregates videos and their predictions.
+        predictions_dict = {}
+        # preprocessing
+        for (pred, true, path) in prediction_list:
+            # get index of max prediction
+            pred = max(pred, 0)[1].item()
+            true = true.item()
+            file_name = re.search('.+(?=_\d+\.pickle)', path).group()
 
-        if file_name not in predictions_dict.keys():
-            predictions_dict[file_name] = {'pred': [pred], 'true': true}
-        else:
-            predictions_dict[file_name]['pred'].append(pred)
+            # if the movie is not in prediction_dict add it if it is then add the prediction to it.
 
-    num_correct = 0
-    num_mistakes = 0
-    for video, preds in predictions_dict.items():
-        majority_vote = find_majority(preds['pred']) # note that in case of ties, it counts as a mistake
-        if majority_vote == preds['true']:
-            num_correct += 1
-        else:
-            num_mistakes += 1
+            if file_name not in predictions_dict.keys():
+                predictions_dict[file_name] = {'pred': [pred], 'true': true}
+            else:
+                predictions_dict[file_name]['pred'].append(pred)
 
-    # print(num_correct, video_count, misclassified_videos)
+        num_correct = 0
+        num_mistakes = 0
+        for video, preds in predictions_dict.items():
+            majority_vote = find_majority(preds['pred']) # note that in case of ties, it counts as a mistake
+            if majority_vote == preds['true']:
+                num_correct += 1
+            else:
+                num_mistakes += 1
+
+        # print(num_correct, video_count, misclassified_videos)
+
+    elif method == 'sum_predictions':
+        predictions_dict = {}
+        # preprocessing
+        for (pred, true, path) in prediction_list:
+            # sum up predictions for each video
+            true = true.item()
+            file_name = re.search('.+(?=_\d+\.pickle)', path).group()
+
+            if file_name not in predictions_dict.keys():
+                predictions_dict[file_name] = {'pred': pred, 'true': true}
+            else:
+                predictions_dict[file_name]['pred'] = predictions_dict[file_name]['pred'] + pred
+
+        num_correct = 0
+        num_mistakes = 0
+        for videos in predictions_dict.values():
+            pred = videos['pred'].max(0)[1].item()
+            if pred == videos['true']:
+                num_correct += 1
+            else:
+                num_mistakes += 1
+
+    else:
+        raise NameError('Unknown method')
+
     video_count = len(predictions_dict.keys())
     return np.round(num_correct/video_count*100, 4)
+
 
 def find_majority(votes):
     vote_count = Counter(votes)
@@ -307,3 +339,7 @@ def open_pickled_object(path):
     with open(path, 'rb') as handle:
         file = pickle.load(handle)
     return file
+
+
+def log_confusion_matrix(experiment):
+    pass
