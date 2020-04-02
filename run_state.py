@@ -125,7 +125,7 @@ class Run:
         for (pred, true, path) in self.best_model_preds:
             y_pred.append(max(pred, 0)[1].item())
             y_true.append(true.item())
-        cm = confusion_matrix(y_true, y_pred)
+        cm = confusion_matrix(y_true, y_pred).tolist()
         print(cm)
         self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm)
 
