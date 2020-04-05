@@ -195,14 +195,14 @@ def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = F
     receives the predictions for a full epoch of videos. Assuming each video has at least 5 mini-clips,
     runs majority vote per video and finally calculates the accuracy.
     tie counts as mistake.
-    method argument: 'individual' - predict the outcome for each video independently. Then do majority vote
+    method argument: 'majority_vote' - predict the outcome for each video independently. Then do majority vote
                      'sum_predictions' - take the sum of predictions for all classes then use argmax to get prediction
     """
     predictions_dict = {}
     pred_list, true_list = [], []
     num_correct, num_mistakes = 0, 0
 
-    if method == 'individual':
+    if method == 'majority_vote':
         # prediction_dict is a dictionary that aggregates videos and their predictions.
 
         # preprocessing
