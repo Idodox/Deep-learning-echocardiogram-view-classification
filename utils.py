@@ -190,7 +190,7 @@ def online_mean_and_std(loader):
     print(pixel_std)
 
 
-def calc_accuracy(prediction_list, method = 'sum_predictions'):
+def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = False):
     """
     receives the predictions for a full epoch of videos. Assuming each video has at least 5 mini-clips,
     runs majority vote per video and finally calculates the accuracy.
@@ -198,10 +198,13 @@ def calc_accuracy(prediction_list, method = 'sum_predictions'):
     method argument: 'individual' - predict the outcome for each video independently. Then do majority vote
                      'sum_predictions' - take the sum of predictions for all classes then use argmax to get prediction
     """
+    predictions_dict = {}
+    pred_list, true_list = [], []
+    num_correct, num_mistakes = 0, 0
 
     if method == 'individual':
         # prediction_dict is a dictionary that aggregates videos and their predictions.
-        predictions_dict = {}
+
         # preprocessing
         for (pred, true, path) in prediction_list:
             # get index of max prediction
@@ -216,11 +219,15 @@ def calc_accuracy(prediction_list, method = 'sum_predictions'):
             else:
                 predictions_dict[file_name]['pred'].append(pred)
 
-        num_correct = 0
-        num_mistakes = 0
-        for video, preds in predictions_dict.items():
-            majority_vote = find_majority(preds['pred']) # note that in case of ties, it counts as a mistake
-            if majority_vote == preds['true']:
+        for videos in prediction_dict.values():
+            pred_list.append(find_majority(preds['pred'])) # note that in case of ties, it counts as a mistake
+            true_list.append(videos['true'])
+
+        if export_for_cm:
+            return pred_list, true_list
+
+        for pred, true in zip(pred_list, true_list):
+            if pred == true:
                 num_correct += 1
             else:
                 num_mistakes += 1
@@ -228,7 +235,6 @@ def calc_accuracy(prediction_list, method = 'sum_predictions'):
         # print(num_correct, video_count, misclassified_videos)
 
     elif method == 'sum_predictions':
-        predictions_dict = {}
         # preprocessing
         for (pred, true, path) in prediction_list:
             # sum up predictions for each video
@@ -240,11 +246,15 @@ def calc_accuracy(prediction_list, method = 'sum_predictions'):
             else:
                 predictions_dict[file_name]['pred'] = predictions_dict[file_name]['pred'] + pred
 
-        num_correct = 0
-        num_mistakes = 0
-        for videos in predictions_dict.values():
-            pred = videos['pred'].max(0)[1].item()
-            if pred == videos['true']:
+        for videos in prediction_dict.values():
+            pred_list.append(videos['pred'].max(0)[1].item())
+            true_list.append(videos['true'])
+
+        if export_for_cm:
+            return pred_list, true_list
+
+        for pred, true in zip(pred_list, true_list):
+            if pred == true:
                 num_correct += 1
             else:
                 num_mistakes += 1
@@ -263,6 +273,7 @@ def find_majority(votes):
         # It is a tie
         return -1
     return top_two[0][0]
+
 
 def save_plot_clip_frames(clip, label, path, target_folder ="clip_plots", added_info_to_path = ""):
     movie_name = re.search('.+(?=_\d+\.pickle)', path).group()
@@ -339,7 +350,3 @@ def open_pickled_object(path):
     with open(path, 'rb') as handle:
         file = pickle.load(handle)
     return file
-
-
-def log_confusion_matrix(experiment):
-    pass
