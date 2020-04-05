@@ -8,6 +8,7 @@ import torch.nn as nn
 from tqdm import tqdm
 from torchsummary import summary
 from sklearn.metrics import confusion_matrix
+from utils import calc_accuracy
 
 
 """
@@ -120,12 +121,21 @@ class Run:
     def print_summary(self):
         summary(self.model, (self.color_channels, self.hyper_params["max_frames"], self.hyper_params["resolution"], self.hyper_params["resolution"]))
 
-    def log_confusion_matrix(self):
+    def log_confusion_matrix(self, print_matrix = True):
         y_pred, y_true = list(), list()
         for (pred, true, path) in self.best_model_preds:
             y_pred.append(max(pred, 0)[1].item())
             y_true.append(true.item())
-        cm = confusion_matrix(y_true, y_pred).tolist()
-        print(cm)
-        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm)
+        cm = confusion_matrix(y_true, y_pred)
+        if print_matrix:
+            print("Confusion matrix, based on individual clips - not movies.")
+            print(cm)
+        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm.tolist(), title = "Confusion matrix, individual clips")
+        cm = calc_accuracy(self.best_model_preds, method = 'sum_predictions', export_for_cm=True)
+        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm.tolist(), title = "Confusion matrix, sum predictions")
+        cm = calc_accuracy(self.best_model_preds, method = 'majority_vote', export_for_cm=True)
+        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm.tolist(), title = "Confusion matrix, majority vote")
+
+
+
 
