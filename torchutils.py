@@ -9,6 +9,7 @@ from modular_cnn import ModularCNN, make_layers
 from utils import get_num_correct, get_mistakes, calc_accuracy
 import numpy as np
 from resnext_util import generate_resnext_model
+import os
 
 
 class DatasetFolderWithPaths(datasets.DatasetFolder):
@@ -38,7 +39,7 @@ class ToTensor(object):
         Returns:
             Tensor: Converted array.
         """
-        return torch.from_numpy(arr)
+        return torch.from_numpy(arr).float()
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
@@ -192,6 +193,18 @@ def save_checkpoint(state, is_best, filename='checkpoint.pt.tar'):
         shutil.copyfile(filename, 'model_best.pt.tar')
 
 
+def load_checkpoint(model, path):
+    if os.path.isfile(path):
+        print("=> loading checkpoint '{}'".format(path))
+        if not torch.cuda.is_available():
+            checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        else:
+            checkpoint = torch.load(path, map_location='cuda:0')
+        model.load_state_dict(checkpoint['state_dict'])
+        print("=> loaded checkpoint '{}' (epoch {})"
+              .format(path, checkpoint['epoch']))
+    else:
+        print("=> no checkpoint found at '{}'".format(path))
 
 def train(epoch, run):
     total_train_loss = 0
@@ -301,6 +314,16 @@ def evaluate(epoch, run):
     }, is_best)
 
 
+def create_model(hyper_params):
+    # In this way we can build a model using the function outside the class as well as in it.
+    if hyper_params['model_type'] == "3dCNN":
+        return get_modular_3dCNN(hyper_params)
+    elif hyper_params['model_type'] == 'resnext':
+        return get_resnext(hyper_params)
+    else:
+        raise NameError("Unknown model type")
+
+
 def get_resnext(hyper_params):
     model = generate_resnext_model('score') # in score, last_ft=True, in feature, last_fc=False
     model = nn.DataParallel(model).cuda(0)
@@ -324,5 +347,5 @@ def get_modular_3dCNN(hyper_params):
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = nn.DataParallel(model).cuda(0)
-    model.to(torch.device('cuda:0'))
+        model.to(torch.device('cuda:0'))
     return model

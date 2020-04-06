@@ -4,10 +4,10 @@ import numpy as np
 from PIL import Image
 import matplotlib.cm as mpl_color_map
 import pickle
-
+import re
+from torchutils import Normalize, ToTensor
+from torchvision import transforms
 from mayavi import mlab
-
-
 import torch
 from torch.autograd import Variable
 from torchvision import models
@@ -138,42 +138,33 @@ def save_image(im, path):
     # mlab.savefig(path)
 
 
-def preprocess_image(pil_im):
+def preprocess_clip(input_clip):
     """
-        Processes image for CNNs
+        Processes clip for CNNs
     Args:
-        PIL_img (PIL_img): Image to process
+        clip (numpy array): Clip to process
     returns:
-        im_as_var (torch variable): Variable that contains processed float tensor
+        clip (torch variable): Variable that contains processed float tensor
     """
-    # mean and std list for channels (Imagenet)
-    mean = [0.21308169, 0.2133352,  0.21363254, 0.21361411, 0.21371935, 0.21371628, 0.21360689, 0.21336799, 0.21276978, 0.2121863]
-    std = [0.21369012, 0.21371147, 0.21385933, 0.2138414,  0.21385933, 0.21388142, 0.21384666, 0.21386346, 0.2137403,  0.21360974]
-    im_as_arr = pil_im / 255
-    # im_as_arr -= mean
-    # im_as_arr /= std
-    # im_as_arr = im_as_arr.transpose(2, 0, 1)  # Convert array to D,W,H
-    # Normalize the channels
-    for image, _ in enumerate(im_as_arr):
-        im_as_arr[image] -= mean[image]
-        im_as_arr[image] /= std[image]
-    # Convert to float tensor
-    im_as_ten = torch.from_numpy(im_as_arr).float()
-    # Add one more channel to the beginning. Tensor shape = 1,3,224,224
-    # this is like batch size?!
-    im_as_ten.unsqueeze_(0)
-    im_as_var = Variable(im_as_ten, requires_grad=True)
+    transformer = transforms.Compose([
+        ToTensor()
+        ,Normalize(0.213303, 0.21379)
+        # ,RandomHorizontalFlip(self.hyper_params["flip_prob"])
+    ])
+    output_clip = transformer(input_clip)
+    # Add one more channel to the beginning. This is like batch size.
+    output_clip.unsqueeze_(0)
 
-    return im_as_var
+    return output_clip
 
 
 def recreate_image(clip):
     """
-        Recreates images from a torch variable, sort of reverse preprocessing
+        Recreates clip from a torch variable, sort of reverse preprocessing
     Args:
-        clip (torch variable): Image to recreate
+        clip (torch variable): clip to recreate
     returns:
-        recreated_clip (numpy arr): Recreated image in array
+        recreated_clip (numpy arr): Recreated clip in array
     """
     reverse_mean = -1*np.array([0.21308169, 0.2133352,  0.21363254, 0.21361411, 0.21371935, 0.21371628, 0.21360689, 0.21336799, 0.21276978, 0.2121863])
     reverse_std = 1/np.array([0.21369012, 0.21371147, 0.21385933, 0.2138414,  0.21385933, 0.21388142, 0.21384666, 0.21386346, 0.2137403,  0.21360974])
@@ -202,34 +193,25 @@ def get_positive_negative_saliency(gradient):
     return pos_saliency, neg_saliency
 
 
-def get_clip_to_run(filename):
+def get_clip_to_run(clip_path):
     """
-        Gets used variables for almost all visualizations, like the image, model etc.
+        Gets clip for visualizations
     Args:
-        example_index (int): Image id to use from examples
+        path: full path to clip
     returns:
-        original_image (numpy arr): Original image read from the file
-        prep_img (numpy_arr): Processed image
-        target_class (int): Target class for the image
-        file_name_to_export (string): File name to export the visualizations
+        original_clip (numpy arr): Original clip read from the file
+        prep_clip (numpy_arr): Processed clip
+        target_class (str): Target class for the clip
         pretrained_model(Pytorch model): Model to use for the operations
     """
-    with open(filename, 'rb') as handle:
-        clip = pickle.load(handle)
+    with open(clip_path, 'rb') as handle:
+        original_clip = pickle.load(handle)
 
-
-
-    img_path = example_list[example_index][0]
-    target_class = example_list[example_index][1]
-    file_name_to_export = img_path[img_path.rfind('/')+1:img_path.rfind('.')]
-    # Read image
-    original_image = Image.open(img_path).convert('RGB')
-    # Process image
-    prep_img = preprocess_image(original_image)
-    # Define model
-    pretrained_model = models.alexnet(pretrained=True)
-    return (original_image,
-            prep_img,
-            target_class,
-            file_name_to_export,
-            pretrained_model)
+    movie_name = re.search('.+(?=_\d+\.pickle)', clip_path).group()
+    target_class = re.search(r'(\/)(2CH|3CH|4CH|apex|mitral)(\/)', clip_path).group()[1:-1]
+    # Process clip
+    prep_clip = preprocess_clip(original_clip)
+    return (original_clip,
+            prep_clip,
+            movie_name,
+            target_class)

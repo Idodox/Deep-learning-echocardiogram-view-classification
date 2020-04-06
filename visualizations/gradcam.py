@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 from vis_utils import get_clip_to_run, save_class_activation_images
-
+from torchutils import create_model, load_checkpoint
 
 class CamExtractor:
     """
@@ -97,12 +97,29 @@ class GradCam():
 
 if __name__ == '__main__':
     # Get params
-    target_example = 0  #
-    (original_image, prep_img, target_class, file_name_to_export, pretrained_model) = get_clip_to_run(target_example)
+
+    hyper_params = {"max_frames": 10
+        , "random_seed": 999
+        , "classes": ['apex', 'papillary', 'mitral', '2CH', '3CH', '4CH']
+        , "model_type": "3dCNN"
+        , "resolution": 100
+        , "adaptive_pool": (7, 5, 5)
+        , "features": [16, 16, "M", 16, 16, "M", 32, 32, "M"]
+        , "classifier": [0.5, 100, 0.4, 50]
+     }
+
+    clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
+    checkpoint_path = '/Users/idofarhi/Documents/Thesis/Code/model_best.pt.tar'
+
+    (original_clip, prep_clip, movie_name, target_class) = get_clip_to_run(clip_path)
+
+    model = create_model(hyper_params)
+    pretrained_model = load_checkpoint(model, checkpoint_path)
+
     # Grad cam
     grad_cam = GradCam(pretrained_model, target_layer=11)
     # Generate cam mask
-    cam = grad_cam.generate_cam(prep_img, target_class)
+    cam = grad_cam.generate_cam(prep_clip, target_class)
     # Save mask
-    save_class_activation_images(original_image, cam, file_name_to_export)
+    save_class_activation_images(original_clip, cam, movie_name)
     print('Grad cam completed')

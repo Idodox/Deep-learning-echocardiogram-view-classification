@@ -30,19 +30,6 @@ def mkdir_if_missing(dirname):
                 raise
 
 
-def check_isfile(fpath):
-    """Checks if the given path is a file.
-    Args:
-        fpath (str): file path.
-    Returns:
-       bool
-    """
-    isfile = osp.isfile(fpath)
-    if not isfile:
-        warnings.warn('No file found at "{}"'.format(fpath))
-    return isfile
-
-
 def get_num_correct(preds, labels):
     return preds.argmax(dim=1).eq(labels).sum().item()
 

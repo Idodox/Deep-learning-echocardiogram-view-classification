@@ -7,7 +7,7 @@ from torchvision import models
 
 import torchutils
 from modular_cnn import ModularCNN, make_layers
-from vis_utils import preprocess_image, recreate_image, save_image
+from vis_utils import preprocess_clip, recreate_image, save_image
 
 
 class CNNLayerVisualization:
@@ -37,7 +37,7 @@ class CNNLayerVisualization:
         # Generate a random image
         random_image = np.uint8(np.random.uniform(150, 180, (1, 10, 100, 100)))
         # Process image and return variable
-        processed_image = preprocess_image(random_image)
+        processed_image = preprocess_clip(random_image)
         print(processed_image.shape)
         # Define optimizer for the image
         optimizer = Adam([processed_image], lr=0.5, weight_decay=1e-6)
