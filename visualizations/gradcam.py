@@ -105,8 +105,8 @@ if __name__ == '__main__':
         , "resolution": 100
         , "adaptive_pool": (7, 5, 5)
         , "features": [16, 16, "M", 16, 16, "M", 32, 32, "M"]
-        , "classifier": [0.5, 100, 0.4, 50]
-     }
+        , "classifier": [0.5, 200, 0.5, 150, 0.4, 100]
+                    }
 
     clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
     checkpoint_path = '/Users/idofarhi/Documents/Thesis/Code/model_best.pt.tar'
