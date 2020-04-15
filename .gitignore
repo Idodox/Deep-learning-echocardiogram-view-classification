@@ -6,6 +6,9 @@
 # generated images
 generated
 
+#grad-cam
+cam_saved_images
+
 #pycharm models
 *.pt
 *.pt.tar
