@@ -337,3 +337,11 @@ def open_pickled_object(path):
     with open(path, 'rb') as handle:
         file = pickle.load(handle)
     return file
+
+def get_class_number(class_name):
+    class_to_idx = {'2CH': 0, '3CH': 1, '4CH': 2, 'apex': 3, 'mitral': 4, 'papillary': 5}
+    return class_to_idx[class_name]
+
+def get_class_name(class_number):
+    idx_to_name = {0: '2CH', 1: '3CH', 2: '4CH', 3: 'apex', 4: 'mitral', 5: 'papillary'}
+    return idx_to_name[class_number]

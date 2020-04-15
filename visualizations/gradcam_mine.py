@@ -1,7 +1,6 @@
-from PIL import Image
+# from PIL import Image
 import numpy as np
 import torch
-
 from vis_utils import get_clip_to_run, save_class_activation_images
 from torchutils import create_model, load_checkpoint
 
@@ -22,7 +21,11 @@ class CamExtractor:
             Does a forward pass on convolutions, hooks the function at given layer
         """
         conv_output = None
-        for module_pos, module in self.model.features._modules.items():
+        if torch.cuda.is_available():
+            items = self.model.module.features._modules.items()
+        else:
+            items = self.model.features._modules.items()
+        for module_pos, module in items:
             x = module(x)  # Forward
             if int(module_pos) == self.target_layer:
                 x.register_hook(self.save_gradient)
@@ -35,9 +38,21 @@ class CamExtractor:
         """
         # Forward pass on the convolutions
         conv_output, x = self.forward_pass_on_convolutions(x)
+        # There may be an avgpool layer:
+        try:
+            if torch.cuda.is_available():
+                x = self.model.module.avgpool(x)
+            else:
+                x = self.model.avgpool(x)
+        except AttributeError:
+            pass
         x = x.view(x.size(0), -1)  # Flatten
         # Forward pass on the classifier
-        x = self.model.classifier(x)
+        if torch.cuda.is_available():
+            x = self.model.module.classifier(x)
+        else:
+            x = self.model.classifier(x)
+
         return conv_output, x
 
 
@@ -51,25 +66,40 @@ class GradCam():
         # Define extractor
         self.extractor = CamExtractor(self.model, target_layer)
 
-    def generate_cam(self, input_image, target_class=None):
+    def zero_grad(self):
+        if torch.cuda.is_available():
+            self.model.module.features.zero_grad()
+            self.model.module.classifier.zero_grad()
+        else:
+            self.model.features.zero_grad()
+            self.model.classifier.zero_grad()
+        try:
+            if torch.cuda.is_available():
+                self.model.module.avgpool.zero_grad()
+            else:
+                self.model.avgpool.zero_grad()
+        except AttributeError:
+            pass
+
+
+    def generate_cam(self, input_clip, target_class=None):
         # Full forward pass
         # conv_output is the output of convolutions at specified layer
         # model_output is the final output of the model (1, 1000)
-        conv_output, model_output = self.extractor.forward_pass(input_image)
+        conv_output, model_output = self.extractor.forward_pass(input_clip)
         if target_class is None:
             target_class = np.argmax(model_output.data.numpy())
         # Target for backprop
-        one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
+        one_hot_output = torch.cuda.FloatTensor(1, model_output.size()[-1]).zero_()
         one_hot_output[0][target_class] = 1
         # Zero grads
-        self.model.features.zero_grad()
-        self.model.classifier.zero_grad()
+        self.zero_grad()
         # Backward pass with specified target
         model_output.backward(gradient=one_hot_output, retain_graph=True)
         # Get hooked gradients
-        guided_gradients = self.extractor.gradients.data.numpy()[0]
+        guided_gradients = self.extractor.gradients.data.cpu().numpy()[0] # we take it at position 0 to remove batch dimension
         # Get convolution outputs
-        target = conv_output.data.numpy()[0]
+        target = conv_output.data.cpu().numpy()[0]
         # Get weights from gradients
         weights = np.mean(guided_gradients, axis=(1, 2))  # Take averages for each gradient
         # Create empty numpy array for cam
@@ -77,11 +107,10 @@ class GradCam():
         # Multiply each weight with its conv output and then, sum
         for i, w in enumerate(weights):
             cam += w * target[i, :, :]
-        cam = np.maximum(cam, 0)
+        cam = np.max(cam, 0)
         cam = (cam - np.min(cam)) / (np.max(cam) - np.min(cam))  # Normalize between 0-1
         cam = np.uint8(cam * 255)  # Scale between 0-255 to visualize
-        cam = np.uint8(Image.fromarray(cam).resize((input_image.shape[2],
-                       input_image.shape[3]), Image.ANTIALIAS))/255
+        cam = np.uint8(Image.fromarray(cam).resize((input_clip.shape[2], input_clip.shape[3]), Image.ANTIALIAS))/255
         # ^ I am extremely unhappy with this line. Originally resizing was done in cv2 which
         # supports resizing numpy matrices with antialiasing, however,
         # when I moved the repository to PIL, this option was out of the window.
@@ -96,7 +125,6 @@ class GradCam():
 
 
 if __name__ == '__main__':
-    # Get params
 
     hyper_params = {"max_frames": 10
         , "random_seed": 999
@@ -105,11 +133,13 @@ if __name__ == '__main__':
         , "resolution": 100
         , "adaptive_pool": (7, 5, 5)
         , "features": [16, 16, "M", 16, 16, "M", 32, 32, "M"]
-        , "classifier": [0.5, 200, 0.5, 150, 0.4, 100]
-                    }
+        ,"classifier": [0.5, 200,0.5, 150, 0.4, 100]
+     }
 
-    clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
-    checkpoint_path = '/Users/idofarhi/Documents/Thesis/Code/model_best.pt.tar'
+    # clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
+    clip_path = '/home/ido/data/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
+    # checkpoint_path = '/Users/idofarhi/Documents/Thesis/Code/model_best.pt.tar'
+    checkpoint_path = '/home/ido/PycharmProjects/us-view-classification/model_best.pt.tar'
 
     (original_clip, prep_clip, movie_name, target_class) = get_clip_to_run(clip_path)
 
@@ -117,7 +147,7 @@ if __name__ == '__main__':
     pretrained_model = load_checkpoint(model, checkpoint_path)
 
     # Grad cam
-    grad_cam = GradCam(pretrained_model, target_layer=11)
+    grad_cam = GradCam(pretrained_model, target_layer=17)
     # Generate cam mask
     cam = grad_cam.generate_cam(prep_clip, target_class)
     # Save mask

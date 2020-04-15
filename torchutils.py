@@ -46,8 +46,6 @@ class ToTensor(object):
 
 class Normalize(object):
     """Normalize a tensor image with mean and standard deviation.
-    Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform
-    will normalize each channel of the input ``torch.*Tensor`` i.e.
     ``input[channel] = (input[channel] - mean[channel]) / std[channel]``
 
     .. note::
@@ -64,14 +62,6 @@ class Normalize(object):
         self.std = std
 
     def __call__(self, tensor):
-        """
-        Args:
-            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
-
-        Returns:
-            Tensor: Normalized Tensor image.
-        """
-
         new_tensor = tensor.clone()
 
         dtype = tensor.dtype
@@ -84,60 +74,34 @@ class Normalize(object):
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
+class UnNormalize(object):
+    """UnNormalize a tensor image with mean and standard deviation.
+    ``input[channel] = (input[channel] + mean[channel]) * std[channel]``
 
-class RandomZoom(object):
-   #TODO: Make this work for our case
-    def __init__(self,
-                 zoom_range,
-                 fill_mode='constant',
-                 fill_value=0,
-                 target_fill_mode='nearest',
-                 target_fill_value=0.,
-                 lazy=False):
-        """Randomly zoom in and/or out on an image
-        Arguments
-        ---------
-        zoom_range : tuple or list with 2 values, both between (0, infinity)
-            lower and upper bounds on percent zoom.
-            Anything less than 1.0 will zoom in on the image,
-            anything greater than 1.0 will zoom out on the image.
-            e.g. (0.7, 1.0) will only zoom in,
-                 (1.0, 1.4) will only zoom out,
-                 (0.7, 1.4) will randomly zoom in or out
-        fill_mode : string in {'constant', 'nearest'}
-            how to fill the empty space caused by the transform
-        fill_value : float
-            the value to fill the empty space with if fill_mode='constant'
-        lazy    : boolean
-            if true, perform the transform on the tensor and return the tensor
-            if false, only create the affine transform matrix and return that
-        """
-        if not isinstance(zoom_range, list) and not isinstance(zoom_range, tuple):
-            raise ValueError('zoom_range must be tuple or list with 2 values')
-        self.zoom_range = zoom_range
-        self.fill_mode = fill_mode
-        self.fill_value = fill_value
-        self.target_fill_mode = target_fill_mode
-        self.target_fill_value = target_fill_value
-        self.lazy = lazy
+    .. note::
+        This transform acts out of place, i.e., it does not mutates the input tensor.
+    Args:
+        mean (sequence): Sequence of means for each channel.
+        std (sequence): Sequence of standard deviations for each channel.
 
-    def __call__(self, x, y=None):
-        zx = random.uniform(self.zoom_range[0], self.zoom_range[1])
-        zy = random.uniform(self.zoom_range[0], self.zoom_range[1])
-        zoom_matrix = np.array([[zx, 0, 0],
-                                [0, zy, 0],
-                                [0, 0, 1]])
-        if self.lazy:
-            return zoom_matrix
-        else:
-            x_transformed = torch.from_numpy(apply_transform(x.numpy(),
-                zoom_matrix, fill_mode=self.fill_mode, fill_value=self.fill_value))
-            if y:
-                y_transformed = torch.from_numpy(apply_transform(y.numpy(), zoom_matrix,
-                fill_mode=self.target_fill_mode, fill_value=self.target_fill_value))
-                return x_transformed, y_transformed
-            else:
-                return x_transformed
+    """
+
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        new_tensor = tensor.clone()
+
+        dtype = tensor.dtype
+        mean = torch.as_tensor(self.mean, dtype=dtype, device=tensor.device)
+        std = torch.as_tensor(self.std, dtype=dtype, device=tensor.device)
+        for i, image in enumerate(tensor):
+            new_tensor[i] = image.mul_(std).add_(mean)
+        return new_tensor
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 class RandomHorizontalFlip(object):
     """Horizontally flip every frame in the set pending probability.
@@ -171,6 +135,7 @@ def pickle_loader(path, min_frames = None, shuffle_frames = False):
     """
     :param path: path to pickle file
     :return: opens the file and returns the un-pickled file
+    NOTE: the returned file is in the range 0 to 1 !
     """
     # try:
     with open(path, 'rb') as handle:
@@ -195,16 +160,34 @@ def save_checkpoint(state, is_best, filename='checkpoint.pt.tar'):
 
 def load_checkpoint(model, path):
     if os.path.isfile(path):
-        print("=> loading checkpoint '{}'".format(path))
+        print("=> loading checkpoint")
         if not torch.cuda.is_available():
             checkpoint = torch.load(path, map_location=torch.device('cpu'))
         else:
             checkpoint = torch.load(path, map_location='cuda:0')
-        model.load_state_dict(checkpoint['state_dict'])
+        state_dict = checkpoint['state_dict']
+        if 'module' in list(checkpoint['state_dict'].keys())[0]:
+            state_dict = remove_module_from_checkpoint_state_dict(state_dict)
+        model.load_state_dict(state_dict)
         print("=> loaded checkpoint '{}' (epoch {})"
               .format(path, checkpoint['epoch']))
+        return model
     else:
-        print("=> no checkpoint found at '{}'".format(path))
+        print("=> no checkpoint file found at '{}'".format(path))
+
+
+def remove_module_from_checkpoint_state_dict(state_dict):
+    """
+    Removes the prefix `module` from weight names that gets added by
+    torch.nn.DataParallel()
+    """
+    from collections import OrderedDict
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = k[7:]  # remove `module.`
+        new_state_dict[name] = v
+    return new_state_dict
+
 
 def train(epoch, run):
     total_train_loss = 0
