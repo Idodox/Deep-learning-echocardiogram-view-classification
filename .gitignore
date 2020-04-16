@@ -4,10 +4,10 @@
 
 
 # generated images
-generated
+generated/
 
 #grad-cam
-cam_saved_images
+cam_saved_images/
 
 #pycharm models
 *.pt
