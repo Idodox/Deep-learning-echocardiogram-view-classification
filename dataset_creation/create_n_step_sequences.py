@@ -9,27 +9,28 @@ from utils import get_frame_sequences, mkdir_if_missing, get_files_list, load_an
 ############### CONFIG ########################
 
 # view_list = ['apex', 'mitral', 'papillary']
-# view_list = ['papillary']
-view_list = ['2CH', '3CH', '4CH']
+view_list = ['2CH', '3CH', '4CH', 'apex', 'mitral', 'papillary']
 step_size = 5
 min_frames = 10
-final_dim = 100
+final_dim = 250
 
 # source_directory = {}
 
-source_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/color/apex',
-                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/color/mitral',
-                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/color/papillary',
+source_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/apex',
+                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/mitral',
+                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/papillary',
                     '2CH': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/2CH',
                     '3CH': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/3CH',
                     '4CH': '/Users/idofarhi/Documents/Thesis/Data/frames/raw/4CH'}
 
-target_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/apex',
-                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/mitral',
-                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/papillary',
-                    '2CH': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/2CH',
-                    '3CH': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/3CH',
-                    '4CH': '/Users/idofarhi/Documents/Thesis/Data/frames/' + str(step_size) + 'frame_steps' + str(min_frames) + '/4CH'
+folder_name = str(min_frames)+'frame_'+str(step_size)+'steps_'+str(final_dim)+'px'
+
+target_directory = {'apex': '/Users/idofarhi/Documents/Thesis/Data/frames/' + folder_name + '/apex',
+                    'mitral': '/Users/idofarhi/Documents/Thesis/Data/frames/' + folder_name + '/mitral',
+                    'papillary': '/Users/idofarhi/Documents/Thesis/Data/frames/' + folder_name + '/papillary',
+                    '2CH': '/Users/idofarhi/Documents/Thesis/Data/frames/' + folder_name + '/2CH',
+                    '3CH': '/Users/idofarhi/Documents/Thesis/Data/frames/' + folder_name + '/3CH',
+                    '4CH': '/Users/idofarhi/Documents/Thesis/Data/frames/' + folder_name + '/4CH'
                     }
 
 #################################################

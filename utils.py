@@ -190,7 +190,7 @@ def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = F
     num_correct, num_mistakes = 0, 0
 
     if method == 'majority_vote':
-        # prediction_dict is a dictionary that aggregates videos and their predictions.
+        # predictions_dict is a dictionary that aggregates videos and their predictions.
 
         # preprocessing
         for (pred, true, path) in prediction_list:
@@ -199,14 +199,14 @@ def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = F
             true = true.item()
             file_name = re.search('.+(?=_\d+\.pickle)', path).group()
 
-            # if the movie is not in prediction_dict add it if it is then add the prediction to it.
+            # if the movie is not in predictions_dict add it if it is then add the prediction to it.
 
             if file_name not in predictions_dict.keys():
                 predictions_dict[file_name] = {'pred': [pred], 'true': true}
             else:
                 predictions_dict[file_name]['pred'].append(pred)
 
-        for videos in prediction_dict.values():
+        for videos in predictions_dict.values():
             pred_list.append(find_majority(preds['pred'])) # note that in case of ties, it counts as a mistake
             true_list.append(videos['true'])
 
@@ -233,7 +233,7 @@ def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = F
             else:
                 predictions_dict[file_name]['pred'] = predictions_dict[file_name]['pred'] + pred
 
-        for videos in prediction_dict.values():
+        for videos in predictions_dict.values():
             pred_list.append(videos['pred'].max(0)[1].item())
             true_list.append(videos['true'])
 

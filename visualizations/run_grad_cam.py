@@ -24,7 +24,7 @@ hyper_params = {"max_frames": 10
      }
 
 # clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
-clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/apex/F6BF9PH6_3.pickle'
+clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/papillary/F4BHJOAE_3.pickle'
 # clip_path = '/home/ido/data/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
 checkpoint_path = '/Users/idofarhi/Documents/Thesis/Code/model_best.pt.tar'
 # checkpoint_path = '/home/ido/PycharmProjects/us-view-classification/model_best.pt.tar'
@@ -44,7 +44,7 @@ print("label number:", target_class_number)
 # If None, use class predicted by model
 target_index = None
 
-grad_cam = GradCamVideo(model=model, target_layer_names=["19"], use_cuda=False, input_spatial_size=hyper_params['resolution'])
+grad_cam = GradCamVideo(model=model, target_layer_names=["20"], use_cuda=False, input_spatial_size=hyper_params['resolution'])
 
 mask, output = grad_cam(prep_clip, target_index)
 
