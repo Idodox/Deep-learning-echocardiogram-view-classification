@@ -38,6 +38,7 @@ class Run:
         self.master_dataset = self.set_up_master_dataset()
         self.train_loader, self.val_loader = self.set_up_train_val_loaders()
         self.optimizer = self.set_up_optimizer()
+        self.lr_scheduler = self.set_up_lr_scheduler()
         self.criterion = self.set_up_criterion()
         self.experiment = self.set_up_experiment()
         self.set_up_color()
@@ -105,6 +106,9 @@ class Run:
 
     def set_up_optimizer(self):
         return optim.Adam(self.model.parameters(), lr=self.hyper_params['learning_rate'])
+
+    def set_up_lr_scheduler(self):
+        return optim.lr_scheduler.StepLR(self.optimizer, step_size=self.hyper_params["lr_scheduler"]["step_size"], gamma=self.hyper_params["lr_scheduler"]["gamma"])
 
     def set_up_criterion(self):
         return nn.CrossEntropyLoss()

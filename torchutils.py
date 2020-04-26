@@ -296,6 +296,9 @@ def evaluate(epoch, run):
         'optimizer': run.optimizer.state_dict(),
     }, is_best)
 
+    # Step lr_scheduler
+    run.lr_scheduler.step()
+
 
 def create_model(hyper_params):
     # In this way we can build a model using the function outside the class as well as in it.

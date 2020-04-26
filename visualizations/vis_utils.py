@@ -81,38 +81,6 @@ def preprocess_clip(input_clip):
     return output_clip
 
 
-def recreate_clip(clip):
-    """
-        Recreates clip from a torch variable, sort of reverse preprocessing
-    Args:
-        clip (torch variable): clip to recreate
-    returns:
-        recreated_clip (numpy arr): Recreated clip in array
-    """
-
-    recreated_clip = copy.copy(clip.data).cpu().squeeze(0) # remove batch dimension and move to CPU
-
-    unnormalize_op = UnNormalize(0.213303, 0.21379)
-    recreated_clip = unnormalize_op(recreated_clip)
-
-    recreated_clip[recreated_clip > 1] = 1
-    recreated_clip[recreated_clip < 0] = 0
-    recreated_clip = np.round(recreated_clip * 255)
-
-    # recreated_clip = np.uint8(recreated_clip).transpose(1, 2, 0)
-
-
-
-
-    # input_data_unnormalised = input_data_unnormalised.permute(1, 2, 3, 0).numpy()
-    input_data_unnormalised = np.flip(input_data_unnormalised, 3)
-
-
-
-
-    return recreated_clip
-
-
 def get_clip_to_run(clip_path):
     """
         Gets clip for visualizations
