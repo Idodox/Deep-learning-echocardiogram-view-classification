@@ -5,6 +5,7 @@ from functools import partial
 import torch
 import torch.optim as optim
 import torch.nn as nn
+import pickle
 from tqdm import tqdm
 from torchsummary import summary
 from sklearn.metrics import confusion_matrix
@@ -79,10 +80,11 @@ class Run:
 
     def set_up_train_val_loaders(self):
 
-        train_idx, val_idx = get_train_val_idx(self.master_dataset, random_state = self.hyper_params['random_seed'], test_size = 0.2)
+        self.train_idx, self.val_idx = get_train_val_idx(self.master_dataset, random_state = self.hyper_params['random_seed'], test_size = 0.2)
 
-        train_set = torch.utils.data.Subset(self.master_dataset, train_idx)
-        val_set = torch.utils.data.Subset(self.master_dataset, val_idx)
+
+        train_set = torch.utils.data.Subset(self.master_dataset, self.train_idx)
+        val_set = torch.utils.data.Subset(self.master_dataset, self.val_idx)
 
         train_loader = torch.utils.data.DataLoader(train_set
                                              , batch_size=self.hyper_params['batch_size']
@@ -125,7 +127,7 @@ class Run:
     def print_summary(self):
         summary(self.model, (self.color_channels, self.hyper_params["max_frames"], self.hyper_params["resolution"], self.hyper_params["resolution"]))
 
-    def log_confusion_matrix(self, print_matrix = True):
+    def log_confusion_matrices(self, print_matrix = True):
         y_pred, y_true = list(), list()
         for (pred, true, path) in self.best_model_preds:
             y_pred.append(max(pred, 0)[1].item())
@@ -134,12 +136,16 @@ class Run:
         if print_matrix:
             print("Confusion matrix, based on individual clips - not movies.")
             print(cm)
-        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm.tolist(), title = "Confusion matrix, individual clips")
-        cm = calc_accuracy(self.best_model_preds, method = 'sum_predictions', export_for_cm=True)
-        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm.tolist(), title = "Confusion matrix, sum predictions")
-        cm = calc_accuracy(self.best_model_preds, method = 'majority_vote', export_for_cm=True)
-        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm.tolist(), title = "Confusion matrix, majority vote")
+        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm.tolist(), title = "Confusion matrix, individual clips", file_name="individual_clips.json")
+        cm = confusion_matrix(*calc_accuracy(self.best_model_preds, method = 'sum_predictions', export_for_cm=True))
+        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm, title = "Confusion matrix, sum predictions", file_name="sum_predictions.json")
+        cm = confusion_matrix(*calc_accuracy(self.best_model_preds, method = 'majority_vote', export_for_cm=True))
+        self.experiment.log_confusion_matrix(labels=self.train_loader.dataset.dataset.classes, matrix=cm, title = "Confusion matrix, majority vote", file_name="majority_vote.json")
 
+    def save_model(self, path, filename):
+        torch.save(self.model.state_dict(), path + filename)
 
-
-
+    def save_run_indexes(self, path, filename):
+        # save run indexes tuple as pickle
+        with open(path + filename, 'wb') as file:
+            pickle.dump((self.train_idx, self.val_idx), file, protocol=pickle.HIGHEST_PROTOCOL)

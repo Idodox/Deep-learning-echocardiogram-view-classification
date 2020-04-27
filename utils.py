@@ -86,6 +86,9 @@ def get_mistakes(preds, labels, paths):
 
 
 def get_train_val_idx(data_set, random_state, test_size = 0.2):
+    """
+    returns stratified split of *movies*, groups all clips of the same movie into one of the groups.
+    """
     # Separate data set into movie names so we can split by movie:
     movie_list = list()
     label_list = list()
@@ -207,7 +210,7 @@ def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = F
                 predictions_dict[file_name]['pred'].append(pred)
 
         for videos in predictions_dict.values():
-            pred_list.append(find_majority(preds['pred'])) # note that in case of ties, it counts as a mistake
+            pred_list.append(find_majority(videos['pred'])) # note that in case of ties, it counts as a mistake
             true_list.append(videos['true'])
 
         if export_for_cm:
@@ -258,7 +261,8 @@ def find_majority(votes):
     top_two = vote_count.most_common(2)
     if len(top_two)>1 and top_two[0][1] == top_two[1][1]:
         # It is a tie
-        return -1
+        print("WARNING - there is a tie in majority vote! marking class 0, results will be incorrect!")
+        return 0
     return top_two[0][0]
 
 
