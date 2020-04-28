@@ -14,6 +14,11 @@ cam_saved_images/
 *.pt.tar
 *.pth
 
+#pickle files
+*.pickle
+
+#json files
+*.json
 
 # IPython
 profile_default/
