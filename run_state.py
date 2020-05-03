@@ -19,7 +19,7 @@ This class holds the state for the run.
 
 class Run:
 
-    def __init__(self, hyper_params, machine, disable_experiment = True):
+    def __init__(self, hyper_params, machine, disable_experiment = True, inference = False, checkpoint_path = ""):
         torch.backends.cudnn.benchmark=True
 
         self.hyper_params = hyper_params
@@ -35,14 +35,20 @@ class Run:
         self.model = self.create_model()
         self.log_n_parameters()
         self.set_up_machine()
-        self.data_transforms = self.set_up_transforms()
-        self.master_dataset = self.set_up_master_dataset()
-        self.train_loader, self.val_loader = self.set_up_train_val_loaders()
-        self.optimizer = self.set_up_optimizer()
-        self.lr_scheduler = self.set_up_lr_scheduler()
-        self.criterion = self.set_up_criterion()
-        self.experiment = self.set_up_experiment()
         self.set_up_color()
+        self.data_transforms = self.set_up_transforms()
+        self.criterion = self.set_up_criterion()
+        if not inference:
+            self.master_dataset = self.set_up_master_dataset()
+            self.set_train_val_idx()
+            self.train_loader, self.val_loader = self.set_up_train_val_loaders()
+            self.optimizer = self.set_up_optimizer()
+            self.lr_scheduler = self.set_up_lr_scheduler()
+            self.experiment = self.set_up_experiment()
+        else:
+            self.model.eval()
+            self.pretrained_model = load_checkpoint(self.model, checkpoint_path)
+
 
     def create_model(self):
         if self.hyper_params['model_type'] == "3dCNN":
@@ -59,7 +65,7 @@ class Run:
     def set_up_machine(self):
         if self.machine == 'server':
             self.root_path = str("/home/ido/data/" + self.hyper_params['dataset'])
-        elif self.machine == 'local':
+        elif self.machine == 'pc':
             self.root_path = str('/Users/idofarhi/Documents/Thesis/Data/frames/' + self.hyper_params['dataset'])
         else:
             raise NameError("Unknown machine")
@@ -77,11 +83,10 @@ class Run:
                                         ,loader = partial(pickle_loader, min_frames = self.hyper_params['max_frames'], shuffle_frames = False)
                                         ,extensions = '.pickle'
                                         )
-
-    def set_up_train_val_loaders(self):
-
+    def set_train_val_idx(self):
         self.train_idx, self.val_idx = get_train_val_idx(self.master_dataset, random_state = self.hyper_params['random_seed'], test_size = 0.2)
 
+    def set_up_train_val_loaders(self):
 
         train_set = torch.utils.data.Subset(self.master_dataset, self.train_idx)
         val_set = torch.utils.data.Subset(self.master_dataset, self.val_idx)

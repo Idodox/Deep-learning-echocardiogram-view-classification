@@ -1,84 +1,49 @@
 from comet_ml import Experiment
-import torch
-import torch.optim as optim
-import torch.nn as nn
-import torchvision
-from torchvision import transforms
-from functools import partial
+import os
 from tqdm import tqdm
-from pathlib import Path
+from run_state import Run
+from torchutils import *
 
-from model_architectures import cnn_3d_1
-from torchsummary import summary
-from torchutils import pickle_loader, DatasetFolderWithPaths
-from utils import get_num_correct, get_mistakes, get_train_val_idx, get_cross_val_idx, online_mean_and_std, \
-    calc_accuracy
-
-torch.backends.cudnn.benchmark=True
 print('CUDA available:', torch.cuda.is_available())
 print('CUDA enabled:', torch.backends.cudnn.enabled)
+# torch.cuda.empty_cache()
+torch.cuda.get_device_capability(0)
 
-log_data = True
+save_experiment = True
 
-#TODO: update get_cross_val_idx with "random_state" (from hyper params)
-hyper_params = {"learning_rate": 0.00001
-               ,"n_epochs": 100
-               ,"batch_size": 50
-               ,"num_workers": 4
-               ,"normalized_data": True
-               ,"stratified": True
-               ,"max_frames": 10
-               ,"dataset": "5frame_steps"
-               ,"resolution": 100
-               ,"conv1_ch": 128
-               ,"conv1_kernel": (3, 9, 9)
-               ,"conv2_ch": 64
-               ,"conv2_kernel": (3, 9, 9)
-               ,"conv3_ch": 32
-               ,"conv3_kernel": (3, 5, 5)
-               ,"conv4_ch": 16
-               ,"conv4_kernel": (1, 3, 3)
-               ,"last_maxpool_kernel": 3
-               ,"fc1_size": 512
-               ,"dropout1_ratio": 0.6
-               ,"fc2_size": 256
-               ,"dropout2_ratio": 0.6
-               ,"fc3_size": 128
-               ,"dropout3_ratio": 0.6
+HP1 = {"learning_rate": 0.001
+      ,"lr_scheduler": {'step_size': 5, 'gamma': 0.8}
+      ,"n_epochs": 80
+      ,"batch_size": 64
+      ,"num_workers": 5
+      ,"normalized_data": True
+      ,"stratified": False
+      ,"horizontal_flip": False
+      ,"max_frames": 10
+      ,"random_seed": 43
+      ,"flip_prob": 0.5
+      ,"dataset": "10frame_5steps_100px"
+      ,"classes": ['apex', 'papillary', 'mitral', '2CH', '3CH', '4CH']
+      ,"model_type": "3dCNN"
+      ,"resolution": 100
+      ,"adaptive_pool": [7,5,5]
+      ,"features": [16,16,"M",32,32,"M",32,32,"M",64,64,64,"M"]
+      ,"classifier": [0.5,200,0.5,150,0.4,100]
                 }
 
 
-model = cnn_3d_1(hyper_params)
-model = model.cuda()
+run = Run(disable_experiment = not save_experiment,
+      machine = 'server',
+      hyper_params= hyper_params)
+
+for epoch in tqdm(range(hyper_params["n_epochs"])):
+
+    train(epoch, run)
+    evaluate(epoch, run)
 
 
-if torch.cuda.device_count() > 1:
-  print("Let's use", torch.cuda.device_count(), "GPUs!")
-  # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-  model = nn.DataParallel(model)
 
-# Log number of parameters
-hyper_params['trainable_params'] = sum(p.numel() for p in model.parameters())
-print('N_trainable_params:', hyper_params['trainable_params'])
 
-data_transforms = transforms.Compose([
-    transforms.ToTensor()
-    ,transforms.Normalize([53.91100598, 54.00132478, 54.09308712, 54.09459359, 54.12711804, 54.13030674, 54.09839364, 54.03708794, 53.8983994, 53.75836842]
-                          , [54.49093735, 54.5142583, 54.56545188, 54.56279357, 54.56717128, 54.57554804, 54.55975601, 54.55826991, 54.53283708, 54.50516662])
-])
-
-ROOT_PATH = str("/home/ido/data/" + hyper_params['dataset'])
-
-master_data_set = DatasetFolderWithPaths(ROOT_PATH
-                                # , transform = data_transforms
-                                , loader = partial(pickle_loader, max_frames = hyper_params['max_frames'])
-                                , extensions = '.pickle'
-                                )
-
-if log_data:
-    # Comet ML experiment
-    experiment = Experiment(api_key="BEnSW6NdCjUCZsWIto0yhxts1" ,project_name="thesis" ,workspace="idodox")
-    experiment.log_parameters(hyper_params)
 
 fold_indexes= get_cross_val_idx(master_data_set)
 curr_fold = 0

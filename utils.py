@@ -121,7 +121,6 @@ def get_train_val_idx(data_set, random_state, test_size = 0.2):
 
 
 def get_cross_val_idx(data_set, random_state, n_splits = 5):
-    # TODO: add assertion to make sure indexes in train are not in val.
 
     movie_list = np.array([])
     label_list = np.array([])
@@ -134,7 +133,7 @@ def get_cross_val_idx(data_set, random_state, n_splits = 5):
 
     fold_indexes = []
 
-    cv = KFold(n_splits=5, random_state=random_state, shuffle=True)
+    cv = KFold(n_splits=n_splits, random_state=random_state, shuffle=True)
     for train_index, val_index in cv.split(movie_list):
 
 
@@ -152,6 +151,10 @@ def get_cross_val_idx(data_set, random_state, n_splits = 5):
                 val_idx.append(i)
             else:
                 raise NameError("movie not in X_train or in X_val")
+
+        # Make sure train and val indexes aren't mixed up
+        for index in train_idx:
+            assert(index not in val_idx)
         fold_indexes.append((train_idx, val_idx))
 
     return fold_indexes
@@ -357,7 +360,7 @@ def calibration(y, p_mean, num_bins=10):
   https://arxiv.org/abs/1706.04599
   https://arxiv.org/abs/1807.00263
   Args:
-    y: one-hot encoding of the true classes, size (?, num_classes)
+    y: true class number
     p_mean: numpy array, size (?, num_classes)
            containing the mean output predicted probabilities
     num_bins: number of bins
@@ -368,12 +371,11 @@ def calibration(y, p_mean, num_bins=10):
        mce: Maximum Calibration Error
       }
   """
+  y = np.array(y)
   # Compute for every test sample x, the predicted class.
   class_pred = np.argmax(p_mean, axis=1)
   # and the confidence (probability) associated with it.
   conf = np.max(p_mean, axis=1)
-  # Convert y from one-hot encoding to the number of the class
-  y = np.argmax(y, axis=1)
   # Storage
   acc_tab = np.zeros(num_bins)  # empirical (true) confidence
   mean_conf = np.zeros(num_bins)  # predicted confidence
@@ -393,9 +395,9 @@ def calibration(y, p_mean, num_bins=10):
         class_pred_sec == y_sec) if nb_items_bin[i] > 0 else np.nan
 
   # Cleaning
-  mean_conf = mean_conf[nb_items_bin > 0]
-  acc_tab = acc_tab[nb_items_bin > 0]
-  nb_items_bin = nb_items_bin[nb_items_bin > 0]
+  # mean_conf = mean_conf[nb_items_bin > 0]
+  # acc_tab = acc_tab[nb_items_bin > 0]
+  # nb_items_bin = nb_items_bin[nb_items_bin > 0]
 
   # Reliability diagram
   reliability_diag = (mean_conf, acc_tab)
@@ -407,6 +409,7 @@ def calibration(y, p_mean, num_bins=10):
   mce = np.max(np.absolute(mean_conf - acc_tab))
   # Saving
   cal = {'reliability_diag': reliability_diag,
+         'samples_per_bucket': nb_items_bin,
          'ece': ece,
          'mce': mce}
   return cal

@@ -12,6 +12,7 @@ from resnext_util import generate_resnext_model
 import os
 
 
+
 class DatasetFolderWithPaths(datasets.DatasetFolder):
     """Custom dataset that includes file paths. Extends
     torchvision.datasets.DatasetFolder
@@ -335,3 +336,10 @@ def get_modular_3dCNN(hyper_params):
         model = nn.DataParallel(model).cuda(0)
         model.to(torch.device('cuda:0'))
     return model
+
+def load_run_for_inference(hyper_params, checkpoint_path, machine = 'server'):
+    from run_state import Run # import placed here to avoid circular dependency with Run
+    run = Run(machine=machine, hyper_params=hyper_params, inference=True, checkpoint_path=checkpoint_path)
+    run.model.eval()
+    return run
+
