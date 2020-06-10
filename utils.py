@@ -85,7 +85,7 @@ def get_mistakes(preds, labels, paths):
     return mistakes
 
 
-def get_train_val_idx(data_set, random_state, test_size = 0.2):
+def extract_train_val_idx(data_set, random_state, test_size = 0.2):
     """
     returns stratified split of *movies*, groups all clips of the same movie into one of the groups.
     """
@@ -120,12 +120,12 @@ def get_train_val_idx(data_set, random_state, test_size = 0.2):
     return train_idx, val_idx
 
 
-def get_cross_val_idx(data_set, random_state, n_splits = 5):
+def get_cross_val_idx(dataset, random_state, n_splits = 5):
 
     movie_list = np.array([])
     label_list = np.array([])
 
-    for (path, label) in data_set.samples:
+    for (path, label) in dataset.samples:
         movie_name = re.search('.+(?=_\d+\.pickle)', path).group()
         if movie_name not in list(movie_list):
             movie_list = np.append(movie_list, movie_name)
@@ -143,7 +143,7 @@ def get_cross_val_idx(data_set, random_state, n_splits = 5):
         train_idx = list()
         val_idx = list()
 
-        for i, (path, label) in enumerate(data_set.samples):
+        for i, (path, label) in enumerate(dataset.samples):
             movie_name = re.search('.+(?=_\d+\.pickle)', path).group()
             if movie_name in X_train:
                 train_idx.append(i)
@@ -212,9 +212,12 @@ def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = F
             else:
                 predictions_dict[file_name]['pred'].append(pred)
 
-        for videos in predictions_dict.values():
-            pred_list.append(find_majority(videos['pred'])) # note that in case of ties, it counts as a mistake
-            true_list.append(videos['true'])
+        for file_name, decimated_clips in predictions_dict.items():
+            majority_class, is_tie = find_majority(decimated_clips['pred'])
+            if is_tie is True:
+                print('There was a tie between clips, chose class 0 as default. Video name:', file_name)
+            pred_list.append(majority_class) # note that in case of ties, it counts as a mistake
+            true_list.append(decimated_clips['true'])
 
         if export_for_cm:
             return pred_list, true_list
@@ -260,13 +263,13 @@ def calc_accuracy(prediction_list, method = 'sum_predictions', export_for_cm = F
 
 
 def find_majority(votes):
+    # This function returns the majority class, and a boolean that indicates if there was a tie
     vote_count = Counter(votes)
     top_two = vote_count.most_common(2)
     if len(top_two)>1 and top_two[0][1] == top_two[1][1]:
         # It is a tie
-        print("WARNING - there is a tie in majority vote! marking class 0, results will be incorrect!")
-        return 0
-    return top_two[0][0]
+        return 0, True
+    return top_two[0][0], False
 
 
 def save_plot_clip_frames(clip, label, path, target_folder ="clip_plots", added_info_to_path = ""):
@@ -333,6 +336,13 @@ def save_image_sequence(frame_list, source_directory, view, target_directory, vi
     # save image set as pickle
     with open(os.path.join(target_directory[view], video + '_' + str(clip_number) + '.pickle'), 'wb') as file:
         pickle.dump(image_array, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+def generate_cm(model_preds):
+    y_pred, y_true = list(), list()
+    for (pred, true, path) in model_preds:
+        y_pred.append(max(pred, 0)[1].item())
+        y_true.append(true.item())
+    return confusion_matrix(y_true, y_pred)
 
 
 def pickle_object(obj, path = "pickle_object"):
@@ -413,3 +423,18 @@ def calibration(y, p_mean, num_bins=10):
          'ece': ece,
          'mce': mce}
   return cal
+
+
+def extract_video_names(incorrect_classifications):
+    """
+    :param incorrect_classifications: list of batches that contain each a list of mistakes that contain each
+    a tuple: (pred_class, true_class, path)
+    :return: a list of aggregated movie names
+    """
+    movie_names = set()
+    for batch in incorrect_classifications:
+        for movie in batch:
+            movie_name = re.search('[^\/]*(?=_\d+\.pickle)', movie[2]).group()
+            movie_names.add(movie_name)
+
+    return movie_names

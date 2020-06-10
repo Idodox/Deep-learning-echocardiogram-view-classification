@@ -11,13 +11,13 @@ class ModularCNN(nn.Module):
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool3d(adaptive_pool)
         self.classifier = nn.Sequential(
-            nn.Linear(features[-4].out_channels * prod(adaptive_pool), classifier[1]),
+            nn.Linear(features[-4].out_channels * prod(adaptive_pool), classifier[0]),
             nn.ReLU(True),
-            nn.Dropout(classifier[0]),
-            nn.Linear(classifier[1], classifier[3]),
+            nn.Dropout(classifier[1]),
+            nn.Linear(classifier[0], classifier[2]),
             nn.ReLU(True),
-            nn.Dropout(classifier[2]),
-            nn.Linear(classifier[3], num_classes),
+            nn.Dropout(classifier[3]),
+            nn.Linear(classifier[2], num_classes),
         )
         if init_weights:
             self._initialize_weights()

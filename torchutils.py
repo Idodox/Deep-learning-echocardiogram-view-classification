@@ -190,7 +190,7 @@ def remove_module_from_checkpoint_state_dict(state_dict):
     return new_state_dict
 
 
-def train(epoch, run):
+def train(epoch, run, mod_name = ''):
     total_train_loss = 0
     total_train_correct = 0
     incorrect_classifications_train = []
@@ -221,8 +221,8 @@ def train(epoch, run):
         num_correct = get_num_correct(preds, labels)
         total_train_correct += num_correct
 
-        run.experiment.log_metric("Train batch accuracy", num_correct / len(labels) * 100, step=run.log_number_train)
-        run.experiment.log_metric("Avg train batch loss", loss.item(), step=run.log_number_train)
+        run.experiment.log_metric(mod_name + "Train batch accuracy", num_correct / len(labels) * 100, step=run.log_number_train)
+        run.experiment.log_metric(mod_name + "Avg train batch loss", loss.item(), step=run.log_number_train)
         run.log_number_train += 1
 
         # print('Train: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct/len(labels)), 'Loss:', loss.item())
@@ -231,12 +231,14 @@ def train(epoch, run):
             epoch_classifications_train.append(prediction)
     epoch_accuracy = calc_accuracy(epoch_classifications_train)
 
-    run.experiment.log_metric("Train epoch accuracy", epoch_accuracy, step=epoch)
-    run.experiment.log_metric("Avg train epoch loss", total_train_loss / batch_number, step=epoch)
+    run.experiment.log_metric(mod_name + "Train epoch accuracy", epoch_accuracy, step=epoch)
+    run.experiment.log_metric(mod_name + "Avg train epoch loss", total_train_loss / batch_number, step=epoch)
+
+
     print('\nTrain: Epoch:', epoch, 'num correct:', total_train_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
 
-def evaluate(epoch, run):
+def evaluate(epoch, run, mod_name = ''):
     incorrect_classifications_val = []
     total_val_loss = 0
     total_val_correct = 0
@@ -262,8 +264,8 @@ def evaluate(epoch, run):
             num_correct = get_num_correct(preds, labels)
             total_val_correct += num_correct
 
-            run.experiment.log_metric("Val batch accuracy", num_correct / len(labels) * 100, step=run.log_number_val)
-            run.experiment.log_metric("Avg val batch loss", loss.item(), step=run.log_number_val)
+            run.experiment.log_metric(mod_name + "Val batch accuracy", num_correct / len(labels) * 100, step=run.log_number_val)
+            run.experiment.log_metric(mod_name + "Avg val batch loss", loss.item(), step=run.log_number_val)
             run.log_number_val += 1
 
             # print('Val: Batch number:', batch_number, 'Num correct:', num_correct, 'Accuracy:', "{:.2%}".format(num_correct / len(labels)), 'Loss:', loss.item())
@@ -276,20 +278,17 @@ def evaluate(epoch, run):
 
         epoch_accuracy = calc_accuracy(epoch_classifications_val)
 
-        run.experiment.log_metric("Val epoch accuracy", epoch_accuracy, step=epoch)
-        run.experiment.log_metric("Avg val epoch loss", total_val_loss / batch_number, step=epoch)
+        run.experiment.log_metric(mod_name + "Val epoch accuracy", epoch_accuracy, step=epoch)
+        run.experiment.log_metric(mod_name + "Avg val epoch loss", total_val_loss / batch_number, step=epoch)
         print('Val Epoch:', epoch, 'num correct:', total_val_correct, 'Accuracy:', str(epoch_accuracy) + '%')
 
-    # if epoch >= hyper_params['n_epochs'] - 1:
-    #     print('TRAIN MISCLASSIFICATIONS:')
-    #     print(incorrect_classifications_train)
-    #     print('TEST MISCLASSIFICATIONS:')
-    #     print(incorrect_classifications_val)
-    is_best = epoch_accuracy > run.best_val_acc
+    is_best = (epoch_accuracy > run.best_val_acc) | ((epoch_accuracy >= run.best_val_acc) & (total_val_loss/batch_number < run.best_val_loss))
     if is_best:
         print("Best run so far! updating params...")
         run.best_val_acc = epoch_accuracy
+        run.best_val_loss = total_val_loss/batch_number
         run.best_model_preds = epoch_classifications_val
+        run.best_model_mistakes = incorrect_classifications_val
     save_checkpoint({
         'epoch': epoch + 1,
         'state_dict': run.model.state_dict(),
