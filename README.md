@@ -1,5 +1,5 @@
 # us-view-classification
-DL based echocardiogram view classification
+Deep learning based echocardiogram view classification using spatio-temporal features
 
 Masters thesis research in cooperation with prof. Dan Adam, Technion institute of technology, Israel.
 
