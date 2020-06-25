@@ -13,7 +13,7 @@ Through the years, improvements in medical imaging have enabled the collection o
 ## Requirements
 * Python 3
 * [PyTorch](http://pytorch.org/)
-* Pytorch vision
+* Torchvision
 * Numpy
 * PIL
 
