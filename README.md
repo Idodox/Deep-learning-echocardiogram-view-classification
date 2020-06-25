@@ -2,7 +2,7 @@
 
 Masters thesis research in cooperation with prof. Dan Adam, Technion institute of technology, Israel.
 
-## Introcudtion:
+## Introduction:
 
 TL'DR: This project classifies echocardiogram videos to one of the 6 main classes without any user input by using a novel architecture which employs 3D CNN's.
 
