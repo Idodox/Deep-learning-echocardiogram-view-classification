@@ -32,7 +32,7 @@ Through the years, improvements in medical imaging have enabled the collection o
 
 * To make mini-clips (pickle) from each video's frames, use the python files in "dataset_creation"
 
-* Once the clips for all classes are ready, update their location in 
+* Once the clips for all classes are ready, update their location in run_state.py
 
 * Use main.py for training a single model, and use main_crossval.py runs cross-validation. Note - State is handled by run_state.py
 
