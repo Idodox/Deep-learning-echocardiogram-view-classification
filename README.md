@@ -9,6 +9,7 @@ TL'DR: This project classifies echocardiogram videos to one of the 6 main classe
 Abstract: 
 Through the years, improvements in medical imaging have enabled the collection of increasingly detailed and precise data useful for making diagnosis and monitoring treatments. In particular, Echocardiography has proven itself as an effective imaging tool in many cases [1]. It is thus routinely used in the diagnosis, management, and follow-up of patients with any suspected or known heart diseases. Analyzing echocardiogram data requires human interpretation by a trained professional, limiting the potential advancement of automatic diagnostic systems. This is partly due to relatively complex multi-view formats. Exacerbating the problem, several views may appear very similar to each other in different parts of the clip. Automatic view classification is thus an essential first step towards a fully autonomic diagnostic system
 
+** Note: This code isn't well documented and could use a refactor. However, as this is a research project those will not be done at this time.
 
 ## Requirements
 * Python 3
@@ -40,8 +41,9 @@ Through the years, improvements in medical imaging have enabled the collection o
 ## Citation
 If you use this code, please cite the following:
 ```
-@article{
+@repository{
   author={Ido Farhi},
   title={Deep learning based echocardiogram view classification using spatio-temporal features},
+  year={2020}
 }
 ```
