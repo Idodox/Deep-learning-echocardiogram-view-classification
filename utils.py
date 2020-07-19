@@ -16,7 +16,10 @@ from matplotlib import use
 use('agg')
 from matplotlib import gridspec
 import math
+import pydicom
 from sklearn.metrics import confusion_matrix
+from skimage.io import imsave
+from cv2 import cvtColor, COLOR_BGR2GRAY
 
 
 
@@ -300,6 +303,7 @@ def save_plot_clip_frames(clip, label, path, target_folder ="clip_plots", added_
     if not full_path.exists():
         print("Error - figure not saved!")
 
+
 def get_files_list(directory):
     """
     returns a list of file names in given directory
@@ -328,6 +332,7 @@ def load_and_process_images(folder, frame_list, crop_size = 300, resize_dim = 10
         images.append(img)
     return np.array(images)
 
+
 def save_image_sequence(frame_list, source_directory, view, target_directory, video, clip_number):
     # sort frames
     sorted_frame_list = sorted(frame_list, key=lambda x: int(re.search(r'(?<=_)[\d]+(?=\.jpg)', x).group()))
@@ -336,6 +341,7 @@ def save_image_sequence(frame_list, source_directory, view, target_directory, vi
     # save image set as pickle
     with open(os.path.join(target_directory[view], video + '_' + str(clip_number) + '.pickle'), 'wb') as file:
         pickle.dump(image_array, file, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 def generate_cm(model_preds):
     y_pred, y_true = list(), list()
@@ -350,14 +356,17 @@ def pickle_object(obj, path = "pickle_object"):
         pickle.dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL)
     print("Object pickled succesfuly.")
 
+
 def open_pickled_object(path):
     with open(path, 'rb') as handle:
         file = pickle.load(handle)
     return file
 
+
 def get_class_number(class_name):
     class_to_idx = {'2CH': 0, '3CH': 1, '4CH': 2, 'apex': 3, 'mitral': 4, 'papillary': 5}
     return class_to_idx[class_name]
+
 
 def get_class_name(class_number):
     idx_to_name = {0: '2CH', 1: '3CH', 2: '4CH', 3: 'apex', 4: 'mitral', 5: 'papillary'}
@@ -438,3 +447,18 @@ def extract_video_names(incorrect_classifications):
             movie_names.add(movie_name)
 
     return movie_names
+
+def load_file(filename):
+    dicom = pydicom.read_file(str(filename))
+    vid = dicom.pixel_array
+    return vid
+
+def write_frames(img_array, video_name, frames_dir, convert_to_grayscale = False):
+    for i, frame in enumerate(img_array):
+        output_filename = str(frames_dir) + '/' + video_name[:-4] + "_" + str(i) + '.jpg'
+#         output_filename = output_filename.encode('unicode_escape')
+        if convert_to_grayscale:
+            frame = cvtColor(frame, COLOR_BGR2GRAY)
+#         print(frame.shape)
+#         break
+        imsave(output_filename,frame)

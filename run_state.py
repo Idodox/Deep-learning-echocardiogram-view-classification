@@ -107,8 +107,8 @@ class Run:
     def prepare_train_val_idx(self):
         self.set_train_val_indexes(extract_train_val_idx(self.master_dataset, random_state = self.hyper_params['random_seed'], test_size = 0.2))
 
-    def set_train_val_indexes(self, train_idx, val_idx):
-        self.train_idx, self.val_idx = train_idx, val_idx
+    def set_train_val_indexes(self, idx_tuple):
+        self.train_idx, self.val_idx = idx_tuple[0], idx_tuple[1]
 
     def set_cross_val_idx(self):
         self.cross_val_idx = get_cross_val_idx(self.master_dataset, random_state = self.hyper_params['random_seed'], n_splits = self.hyper_params['k_folds'])

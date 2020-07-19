@@ -176,6 +176,12 @@ def load_checkpoint(model, path):
     else:
         print("=> no checkpoint file found at '{}'".format(path))
 
+def load_model(model, path, on_cpu = True):
+    if on_cpu:
+        model.load_state_dict(remove_module_from_checkpoint_state_dict(torch.load(path, map_location=torch.device('cpu'))))
+    else:
+        model.load_state_dict(torch.load(path))
+    model.eval()
 
 def remove_module_from_checkpoint_state_dict(state_dict):
     """
