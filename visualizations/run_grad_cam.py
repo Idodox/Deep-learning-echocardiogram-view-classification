@@ -4,8 +4,8 @@ import torch
 import numpy as np
 import shutil
 
-from vis_utils import get_clip_to_run, save_image, recreate_clip
-from torchutils import create_model, load_checkpoint
+from vis_utils import get_clip_to_run, save_image
+from torchutils import create_model, load_checkpoint, load_model
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -13,27 +13,36 @@ plt.jet()
 
 from grad_cam_video import GradCamVideo
 
+############### CONFIG ########################
+
+
 hyper_params = {"max_frames": 10
         , "random_seed": 999
         , "classes": ['apex', 'papillary', 'mitral', '2CH', '3CH', '4CH']
         , "model_type": "3dCNN"
         , "resolution": 100
         , "adaptive_pool": (7, 5, 5)
-        , "features": [16, 16, "M", 16, 16, "M", 32, 32, "M"]
-        ,"classifier": [0.5, 200, 0.5, 150, 0.4, 100]
+        , "features": [16,16,16,"M",32,32,32,"M",32,32,32,"M",64,64,64,"M"]
+        ,"classifier": [200,0.5,150,0.5]
      }
 
-# clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
-clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/5frame_steps10/papillary/F4BHJOAE_3.pickle'
+target_layer = "38"
+
+# clip_path = '/Users/idofarhi/Documents/Thesis/Data/frames/10frame_5steps_100px/2CH/AA-055KAP_2CH_0.pickle'
+clip_path = '/Users/idofarhi/Documents/Thesis/Data/test_set/frames/10frame_5steps_100px/mitral/F4RJ7NPS_3.pickle'
 # clip_path = '/home/ido/data/5frame_steps10/2CH/AA-055KAP_2CH_0.pickle'
-checkpoint_path = '/Users/idofarhi/Documents/Thesis/Code/model_best.pt.tar'
+checkpoint_path = '/Users/idofarhi/Documents/Thesis/model_best.pt.tar'
 # checkpoint_path = '/home/ido/PycharmProjects/us-view-classification/model_best.pt.tar'
+
+#################################################
 
 
 model = create_model(hyper_params)
-model.eval()
+
 
 pretrained_model = load_checkpoint(model, checkpoint_path)
+# pretrained_model = load_model(model, checkpoint_path)
+model.eval()
 
 original_clip, prep_clip, movie_name, target_class_name, target_class_number = get_clip_to_run(clip_path)
 print("loaded sample '{}'".format(clip_path))
@@ -44,7 +53,7 @@ print("label number:", target_class_number)
 # If None, use class predicted by model
 target_index = None
 
-grad_cam = GradCamVideo(model=model, target_layer_names=["20"], use_cuda=False, input_spatial_size=hyper_params['resolution'])
+grad_cam = GradCamVideo(model=model, target_layer_names=[target_layer], use_cuda=False, input_spatial_size=hyper_params['resolution'])
 
 mask, output = grad_cam(prep_clip, target_index)
 
@@ -52,9 +61,9 @@ preds = model(prep_clip).squeeze(0) # squeeze to remove batch dimension
 softmax_preds = torch.nn.functional.softmax(preds, dim=0)
 
 # compute top5 predictions
-pred_prob, pred_top5 = softmax_preds.data.topk(5)
-pred_prob = pred_prob.numpy()
-pred_top5 = pred_top5.numpy()
+# pred_prob, pred_top5 = softmax_preds.data.topk(5)
+# pred_prob = pred_prob.numpy()
+# pred_top5 = pred_top5.numpy()
 
 
 # WRITING IMAGES TO DISK
@@ -68,8 +77,8 @@ try:
 except FileNotFoundError:
     pass
 os.makedirs(output_images_folder_cam_combined, exist_ok=True)
-os.makedirs(output_images_folder_cam, exist_ok=True)
-os.makedirs(output_images_folder_original, exist_ok=True)
+# os.makedirs(output_images_folder_cam, exist_ok=True)
+# os.makedirs(output_images_folder_original, exist_ok=True)
 
 RESIZE_SIZE = 200
 RESIZE_FLAG = 0
@@ -80,7 +89,7 @@ for i in range(mask.shape[0]):
     input_data_img = np.expand_dims(input_data_img, axis = 2) # add grayscale color channel
     input_data_img = input_data_img.astype('float32') # cv2 only works with 32 bit floating point
     input_data_img = cv2.cvtColor(input_data_img,cv2.COLOR_GRAY2RGB)
-    heatmap = cv2.applyColorMap(np.uint8(255 * mask[i]), cv2.COLORMAP_JET)
+    heatmap = cv2.applyColorMap(cv2.bitwise_not(np.uint8(255 * mask[i])), cv2.COLORMAP_JET)
     if RESIZE_FLAG:
         input_data_img = cv2.resize(input_data_img, (RESIZE_SIZE, RESIZE_SIZE))
         heatmap = cv2.resize(heatmap, (RESIZE_SIZE, RESIZE_SIZE))

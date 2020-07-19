@@ -81,6 +81,27 @@ def preprocess_clip(input_clip):
     return output_clip
 
 
+def recreate_clip(clip):
+    """
+        Recreates clip from a torch variable, sort of reverse preprocessing
+    Args:
+        clip (torch variable): clip to recreate
+    returns:
+        recreated_clip (numpy arr): Recreated clip in array
+    """
+
+    recreated_clip = copy.copy(clip.data).cpu().squeeze(0) # remove batch dimension and move to CPU
+
+    unnormalize_op = UnNormalize(0.213303, 0.21379)
+    recreated_clip = unnormalize_op(recreated_clip)
+
+    recreated_clip[recreated_clip > 1] = 1
+    recreated_clip[recreated_clip < 0] = 0
+    recreated_clip = np.round(recreated_clip * 255)
+
+    return recreated_clip
+
+
 def get_clip_to_run(clip_path):
     """
         Gets clip for visualizations
@@ -106,3 +127,19 @@ def get_clip_to_run(clip_path):
             movie_name,
             target_class_name,
             target_class_number)
+
+def prep_pickle_for_inference(pickle_path):
+    """
+    Args:
+        pickle_path: full path to pickle file
+    returns:
+        frames ready to be processed through the model.
+        The function divides by 255 and normalizes the frames.
+    """
+
+    with open(pickle_path, 'rb') as handle:
+        original_clip = pickle.load(handle)/255
+
+    prep_clip = preprocess_clip(original_clip)
+
+    return prep_clip

@@ -7,7 +7,7 @@ from torchvision import models
 
 import torchutils
 from modular_cnn import ModularCNN, make_layers
-from vis_utils import preprocess_clip, recreate_image, save_image
+from vis_utils import preprocess_clip, save_image
 
 
 class CNNLayerVisualization:
@@ -67,8 +67,8 @@ class CNNLayerVisualization:
             loss.backward()
             # Update image
             optimizer.step()
-            # Recreate image
-            self.created_image = recreate_image(processed_image)
+            # TODO: check if we need to recreate image
+            #self.created_image = recreate_image(processed_image)
             # Save image
             if i % 10 == 0:
                 im_path = '../generated/layer_vis_l' + str(self.selected_layer) + \
